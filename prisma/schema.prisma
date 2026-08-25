@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Compatible with Neon, Supabase, or PostgreSQL
+  url      = env("DATABASE_URL")
+}
+
+enum DriveStatus {
+  ACTIVE
+  APPLIED
+  ASSESSMENT_COMPLETED
+  SHORTLISTED
+  INTERVIEW_SCHEDULED
+  REJECTED
+  OFFERED
+  EXPIRED
+}
+
+enum EventType {
+  APP_REGISTRATION      // PESU Academy / In-App
+  REGISTRATION_FORM     // External Google Form / Portal
+  ASSESSMENT_LINK       // OT / HackerRank / Wheebox / Test slots
+  SHORTLIST_RELEASED    // Shortlist PDF / Candidate Table
+  INTERVIEW_SCHEDULE    // Interview slots / Panel links
+  OFFER_ANNOUNCEMENT    // Final Results & Offer Letters
+  GENERAL_UPDATE        // Slot timing changes, guidelines
+}
+
+enum ActionPortalType {
+  PESU_ACADEMY
+  GOOGLE_FORM
+  EXTERNAL_PORTAL
+  ASSESSMENT_PLATFORM
+  OFFLINE_CAMPUS
+  EMAIL_REPLY
+}
+
+enum Tier {
+  TIER_1       // Super Dream (15+ LPA)
+  TIER_2       // Dream (8-14 LPA)
+  TIER_3       // Core / IT (4-7 LPA)
+  MASS_HIRING  // Mass
+}
+
+enum EligibilityStatus {
+  ELIGIBLE
+  BORDERLINE
+  INELIGIBLE
+  NOT_SPECIFIED
+}
+
+model StudentProfile {
+  id              String   @id @default(uuid())
+  name            String   @default("PES Student")
+  email           String   @unique @default("student.placement@pes.edu")
+  usn             String   @default("PES2UG22CS001")
+  branch          String   @default("CSE")
+  cgpa            Float    @default(7.62)
+  batch           Int      @default(2026)
+  activeBacklogs  Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CompanyDrive {
+  id              String            @id @default(uuid())
+  name            String            // e.g. "Goldman Sachs India"
+  canonicalName   String            @unique // e.g. "Goldman Sachs"
+  logoUrl         String?
+  role            String            // e.g. "Summer Analyst / SDE Intern"
+  ctc             String            // e.g. "28.5 LPA"
+  stipend         String?           // e.g. "1.2 Lakh/month"
+  tier            Tier              @default(TIER_1)
+  minCgpa         Float?            // e.g. 7.50
+  allowedBranches String[]          @default(["CSE", "ISE", "ECE", "EEE"])
+  maxBacklogs     Int               @default(0)
+  status          DriveStatus       @default(ACTIVE)
+  currentStage    EventType         @default(APP_REGISTRATION)
+  latestDeadline  DateTime?
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  events          PlacementEvent[]
+  actions         ActionItem[]
+}
+
+model PlacementEvent {
+  id              String            @id @default(uuid())
+  companyId       String
+  company         CompanyDrive      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  eventType       EventType
+  subject         String
+  senderEmail     String            @default("placement@pes.edu")
+  receivedAt      DateTime          @default(now())
+  deadline        DateTime?
+  
+  actionUrl       String?
+  actionPortal    ActionPortalType  @default(PESU_ACADEMY)
+  
+  shortlistCount  Int?
+  shortlistSnippet String?
+  
+  instructions    String?
+  summary         String
+  rawBody         String
+  gmailMessageId  String?           @unique
+  gmailThreadId   String?
+  
+  llmConfidence   Float             @default(0.95)
+  isProcessed     Boolean           @default(true)
+  
+  createdAt       DateTime          @default(now())
+  
+  actions         ActionItem[]
+  
+  @@index([companyId])
+  @@index([eventType])
+}
+
+model ActionItem {
+  id              String            @id @default(uuid())
+  companyId       String
+  company         CompanyDrive      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  eventId         String?
+  event           PlacementEvent?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  
+  title           String
+  portalType      ActionPortalType  @default(PESU_ACADEMY)
+  link            String?
+  deadline        DateTime?
+  isCompleted     Boolean           @default(false)
+  completedAt     DateTime?
+  priority        Int               @default(1) // 1: Urgent (<24h), 2: Normal, 3: Low
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([companyId])
+  @@index([isCompleted, deadline])
+}
+
+model IngestionLog {
+  id              String   @id @default(uuid())
+  gmailMessageId  String?
+  sender          String
+  subject         String
+  parsedCompany   String?
+  detectedEvent   EventType?
+  status          String   // SUCCESS, SKIPPED, FAILED
+  errorMessage    String?
+  rawPayload      String?
+  createdAt       DateTime @default(now())
+}
