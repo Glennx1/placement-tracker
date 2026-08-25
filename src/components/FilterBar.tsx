@@ -118,6 +118,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <option value="APPLIED">Applied</option>
             <option value="SHORTLISTED">Shortlisted</option>
             <option value="OFFERED">Offered</option>
+            <option value="EXPIRED">Expired / Closed</option>
           </select>
 
           {hasActiveFilters && (

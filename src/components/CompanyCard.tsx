@@ -6,7 +6,6 @@ import {
   ChevronUp,
   Clock,
   ExternalLink,
-  Smartphone,
   CheckCircle2,
   AlertCircle,
   FileText,
@@ -37,8 +36,15 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
 
   const eligibility = drive.eligibility;
   const isEligible = eligibility?.status === "ELIGIBLE" || eligibility?.status === "NOT_SPECIFIED";
+  const now = Date.now();
+  const isPastDeadline = drive.latestDeadline && new Date(drive.latestDeadline).getTime() < now;
+  const isExpired = drive.status === "EXPIRED" || (drive.status === "ACTIVE" && isPastDeadline);
 
   const getStatusBadge = (status: DriveStatus) => {
+    if (isExpired) {
+      return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-800 text-gray-400 border border-gray-700">Expired / Closed</span>;
+    }
+
     switch (status) {
       case "OFFERED":
         return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">Offered 🎉</span>;
@@ -50,13 +56,15 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
         return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-950 text-blue-300 border border-blue-800">Applied</span>;
       case "REJECTED":
         return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-950 text-red-300 border border-red-800">Rejected</span>;
+      case "EXPIRED":
+        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-800 text-gray-400 border border-gray-700">Expired</span>;
       default:
         return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-800 text-gray-300 border border-gray-700">Active</span>;
     }
   };
 
   return (
-    <div className="clean-card clean-card-hover overflow-hidden">
+    <div className={`clean-card clean-card-hover overflow-hidden ${isExpired ? "opacity-80" : ""}`}>
       {/* Main Company Row */}
       <div className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -104,9 +112,14 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
               {drive.latestDeadline && (
                 <>
                   <span className="text-gray-500 text-[11px]">•</span>
-                  <span className="text-amber-400/90 text-[11px] font-mono flex items-center gap-1">
+                  <span
+                    className={`text-[11px] font-mono flex items-center gap-1 ${
+                      isPastDeadline ? "text-gray-500 line-through" : "text-amber-400/90"
+                    }`}
+                  >
                     <Clock className="w-2.5 h-2.5" />
-                    Due {new Date(drive.latestDeadline).toLocaleDateString([], { month: "short", day: "numeric" })}
+                    {isPastDeadline ? "Closed " : "Due "}
+                    {new Date(drive.latestDeadline).toLocaleDateString([], { month: "short", day: "numeric" })}
                   </span>
                 </>
               )}
@@ -125,6 +138,7 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
               <option value="SHORTLISTED">Shortlisted</option>
               <option value="INTERVIEW_SCHEDULED">Interview</option>
               <option value="OFFERED">Offered 🎉</option>
+              <option value="EXPIRED">Expired / Closed</option>
               <option value="REJECTED">Rejected</option>
             </select>
 
@@ -191,7 +205,9 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
                           href={event.actionUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-medium flex items-center gap-1"
+                          className={`px-2.5 py-1 rounded text-white text-[11px] font-medium flex items-center gap-1 ${
+                            isPastDeadline ? "bg-gray-800 hover:bg-gray-700 text-gray-400" : "bg-blue-600 hover:bg-blue-500"
+                          }`}
                         >
                           <span>
                             {event.actionPortal === "PESU_ACADEMY"
@@ -202,8 +218,9 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
                         </a>
                       )}
                       {event.deadline && (
-                        <span className="text-[11px] text-amber-400 font-mono">
-                          Deadline: {new Date(event.deadline).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        <span className={`text-[11px] font-mono ${isPastDeadline ? "text-gray-500" : "text-amber-400"}`}>
+                          {isPastDeadline ? "Deadline was: " : "Deadline: "}
+                          {new Date(event.deadline).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
                       )}
                     </div>

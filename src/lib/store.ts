@@ -25,7 +25,7 @@ export const DEFAULT_STUDENT_PROFILE: StudentProfile = {
   activeBacklogs: 0,
 };
 
-// Start with a clean slate (0 placeholder drives)
+// Start with a clean slate
 function createInitialState(): {
   profile: StudentProfile;
   drives: CompanyDrive[];
@@ -61,20 +61,32 @@ class PlacementStore {
 
   public getDrives(): CompanyDrive[] {
     const student = this.state.profile;
+    const now = Date.now();
+
     return this.state.drives.map((drive) => {
       const eligibility = evaluateEligibility(drive, student);
+      
+      // Auto-expire drive if active but deadline has already passed
+      let computedStatus = drive.status;
+      if (
+        computedStatus === "ACTIVE" &&
+        drive.latestDeadline &&
+        new Date(drive.latestDeadline).getTime() < now
+      ) {
+        computedStatus = "EXPIRED";
+      }
+
       return {
         ...drive,
+        status: computedStatus,
         eligibility,
       };
     });
   }
 
   public getDriveById(id: string): CompanyDrive | undefined {
-    const drive = this.state.drives.find((d) => d.id === id);
-    if (!drive) return undefined;
-    const eligibility = evaluateEligibility(drive, this.state.profile);
-    return { ...drive, eligibility };
+    const drives = this.getDrives();
+    return drives.find((d) => d.id === id);
   }
 
   public getLogs(): IngestionLogEntry[] {
@@ -115,6 +127,7 @@ class PlacementStore {
     gmailMessageId?: string;
   }): Promise<{ drive: CompanyDrive; event: PlacementEvent; log: IngestionLogEntry }> {
     const receivedAt = email.receivedAt || new Date().toISOString();
+    const now = Date.now();
     
     // 1. LLM Structured Extraction
     const extraction = await parseEmailWithGemini({
@@ -133,6 +146,10 @@ class PlacementStore {
       (d) => d.canonicalName.toLowerCase() === canonicalName.toLowerCase()
     );
 
+    // Check if initial status is expired due to past deadline
+    const isPastDeadline = extraction.deadline && new Date(extraction.deadline).getTime() < now;
+    const initialStatus: DriveStatus = isPastDeadline ? "EXPIRED" : "ACTIVE";
+
     if (!parentDrive) {
       parentDrive = {
         id: `drive-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -146,7 +163,7 @@ class PlacementStore {
         minCgpa: extraction.minCgpa && extraction.minCgpa > 0 ? extraction.minCgpa : 7.0,
         allowedBranches: extraction.allowedBranches.length > 0 ? extraction.allowedBranches : ["CSE", "ISE", "ECE"],
         maxBacklogs: extraction.maxBacklogs ?? 0,
-        status: "ACTIVE",
+        status: initialStatus,
         currentStage: extraction.eventType,
         latestDeadline: extraction.deadline || null,
         events: [],
@@ -162,6 +179,8 @@ class PlacementStore {
         parentDrive.status = "SHORTLISTED";
       } else if (extraction.eventType === "OFFER_ANNOUNCEMENT") {
         parentDrive.status = "OFFERED";
+      } else if (parentDrive.status === "ACTIVE" && isPastDeadline) {
+        parentDrive.status = "EXPIRED";
       }
     }
 
@@ -188,8 +207,9 @@ class PlacementStore {
 
     parentDrive.events.push(newEvent);
 
-    // 4. Create Action Item if actionable
+    // 4. Create Action Item only if not already expired/past
     if (extraction.actionRequired && extraction.actionTitle) {
+      const isActionExpired = extraction.deadline && new Date(extraction.deadline).getTime() < now;
       const actionItem: ActionItem = {
         id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         companyId: parentDrive.id,
@@ -198,8 +218,8 @@ class PlacementStore {
         portalType: extraction.actionPortal,
         link: extraction.actionUrl || null,
         deadline: extraction.deadline || null,
-        isCompleted: false,
-        priority: extraction.deadline && (new Date(extraction.deadline).getTime() - Date.now() < 24 * 3600 * 1000) ? 1 : 2,
+        isCompleted: Boolean(isActionExpired), // Mark as done/expired if from the past
+        priority: extraction.deadline && (new Date(extraction.deadline).getTime() - now < 24 * 3600 * 1000) ? 1 : 2,
       };
       parentDrive.actions.unshift(actionItem);
     }
