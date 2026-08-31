@@ -91,34 +91,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* Right: Profile & Sync */}
+        {/* Right: Sync Action */}
         <div className="flex items-center gap-2">
-          {/* Profile Tag */}
-          <button
-            onClick={onOpenProfileModal}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm text-xs text-slate-700 transition-all"
-            title="Edit Profile"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="font-semibold text-slate-800">{profile.branch}</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-slate-600 font-mono">{profile.cgpa.toFixed(2)}</span>
-            <Sliders className="w-3 h-3 text-slate-400 ml-0.5" />
-          </button>
-
-          {/* Sync Emails */}
+          {/* Sync Emails Button */}
           <button
             onClick={onSyncGmail}
             disabled={isSyncing}
-            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all text-xs font-semibold flex items-center gap-1.5 disabled:opacity-75"
-            title="Sync latest emails from PESU_TAGGED"
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all text-xs font-semibold flex items-center gap-2 disabled:opacity-75"
+            title="Sync latest emails from PESU_TAGGED / PESU_TRACKED"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-white ${isSyncing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{isSyncing ? "Syncing..." : "Sync Mails"}</span>
+            <span>{isSyncing ? "Syncing Gmail..." : "Sync Mails"}</span>
           </button>
         </div>
       </div>
     </header>
   );
 };
+
 

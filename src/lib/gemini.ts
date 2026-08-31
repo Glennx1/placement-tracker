@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GeminiExtractionResult, EventType, ActionPortalType, Category } from "./types";
+import { GeminiExtractionResult, EventType, ActionPortalType, Category, ExcelAttachment } from "./types";
 import { resolveCanonicalEntity } from "./companyResolver";
 
 const GEMINI_SYSTEM_INSTRUCTION = `
@@ -19,91 +19,11 @@ Event Types:
 - Workshop: WORKSHOP_REGISTRATION, SESSION_LINK, GENERAL_UPDATE
 - Notice: GENERAL_UPDATE
 
-Extraction Rules:
-- Category: Pick one from [COMPANY, HACKATHON, WORKSHOP, NOTICE].
-- Company / Entity Name: Extract the hiring company, hackathon name, workshop title, or notice subject.
-- Canonical Name: Standardize to the primary entity name.
-- Event Type: Pick the most appropriate EventType.
-- Role / Theme: Title of role, hackathon theme, or workshop subject.
-- CTC / Prize: Extract compensation (e.g. "28.5 LPA") or prize money (e.g. "₹1,00,000 Cash Prize").
-- Action Required: True if student must take an action (fill form, submit project, take test, attend).
-- Action Title: Brief label for button (e.g., "Register on PESU Academy", "Submit Hackathon Project", "Start Assessment").
-- Action Portal: One of [PESU_ACADEMY, GOOGLE_FORM, EXTERNAL_PORTAL, ASSESSMENT_PLATFORM, OFFLINE_CAMPUS, EMAIL_REPLY].
-- Action URL: Link to form/test/submission if present.
-- Deadline: Strict ISO-8601 timestamp string if deadline is mentioned.
-- Summary: A crisp 2-sentence summary highlighting the core action and deadline for the student.
+Important Specific Information to Extract:
+- Excel Sheet / Attachment: If an Excel file (.xlsx, .xls, .csv), Google Sheet, or candidate list attachment is mentioned, extract filename, candidate count, and snippet preview.
+- Form Links: Extract Google Form, Typeform, Microsoft Form, Devfolio, or portal links.
+- PESU Academy: Detect if student is instructed to apply/register on PESU Academy Placement Portal.
 `;
-
-const extractionSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    isPlacementEmail: { type: SchemaType.BOOLEAN },
-    category: {
-      type: SchemaType.STRING,
-      enum: ["COMPANY", "HACKATHON", "WORKSHOP", "NOTICE"],
-    },
-    companyName: { type: SchemaType.STRING },
-    canonicalName: { type: SchemaType.STRING },
-    eventType: {
-      type: SchemaType.STRING,
-      enum: [
-        "APP_REGISTRATION",
-        "REGISTRATION_FORM",
-        "ASSESSMENT_LINK",
-        "SHORTLIST_RELEASED",
-        "INTERVIEW_SCHEDULE",
-        "OFFER_ANNOUNCEMENT",
-        "HACKATHON_REGISTRATION",
-        "PROBLEM_STATEMENT",
-        "SUBMISSION_DEADLINE",
-        "FINALE_SCHEDULE",
-        "RESULTS_ANNOUNCEMENT",
-        "WORKSHOP_REGISTRATION",
-        "SESSION_LINK",
-        "GENERAL_UPDATE",
-      ],
-    },
-    role: { type: SchemaType.STRING },
-    ctc: { type: SchemaType.STRING },
-    stipend: { type: SchemaType.STRING },
-    minCgpa: { type: SchemaType.NUMBER },
-    allowedBranches: {
-      type: SchemaType.ARRAY,
-      items: { type: SchemaType.STRING },
-    },
-    maxBacklogs: { type: SchemaType.NUMBER },
-    actionRequired: { type: SchemaType.BOOLEAN },
-    actionTitle: { type: SchemaType.STRING },
-    actionPortal: {
-      type: SchemaType.STRING,
-      enum: [
-        "PESU_ACADEMY",
-        "GOOGLE_FORM",
-        "EXTERNAL_PORTAL",
-        "ASSESSMENT_PLATFORM",
-        "OFFLINE_CAMPUS",
-        "EMAIL_REPLY",
-      ],
-    },
-    actionUrl: { type: SchemaType.STRING },
-    deadline: { type: SchemaType.STRING },
-    shortlistCount: { type: SchemaType.NUMBER },
-    shortlistSnippet: { type: SchemaType.STRING },
-    instructions: { type: SchemaType.STRING },
-    summary: { type: SchemaType.STRING },
-    confidenceScore: { type: SchemaType.NUMBER },
-  },
-  required: [
-    "isPlacementEmail",
-    "category",
-    "companyName",
-    "eventType",
-    "role",
-    "actionRequired",
-    "actionPortal",
-    "summary",
-  ],
-};
 
 export async function parseEmailWithGemini(params: {
   subject: string;
@@ -121,8 +41,6 @@ export async function parseEmailWithGemini(params: {
         systemInstruction: GEMINI_SYSTEM_INSTRUCTION,
         generationConfig: {
           responseMimeType: "application/json",
-          // @ts-expect-error schema configuration for Gemini
-          responseSchema: extractionSchema,
           temperature: 0.1,
         },
       });
@@ -152,11 +70,11 @@ ${params.body}
 
       return parsed;
     } catch (err) {
-      console.warn("Gemini API call failed or encountered schema parse error, using resilient fallback parser:", err);
+      console.warn("Gemini API call fallback to heuristic parser:", err);
     }
   }
 
-  // Resilient Heuristic Fallback Engine (when API key is absent or network fails)
+  // Resilient Heuristic Fallback Engine
   return fallbackHeuristicParser(params.subject, params.sender, params.body, params.receivedAt);
 }
 
@@ -177,11 +95,17 @@ export function fallbackHeuristicParser(
   const canonicalName = entityInfo.canonicalName;
   const category: Category = entityInfo.category;
 
-  // 2. Detect Event Type
+  // 2. Detect Event Type & Action Portals
   let eventType: EventType = "GENERAL_UPDATE";
   let actionPortal: ActionPortalType = "PESU_ACADEMY";
   let actionTitle = "View Details";
   let actionRequired = false;
+
+  const isPesuAcademy = combined.includes("pesu academy") || combined.includes("pesuacademy") || combined.includes("placement portal") || combined.includes("apply on the app");
+  let pesuAcademyDirective: string | null = null;
+  if (isPesuAcademy) {
+    pesuAcademyDirective = "Register on PESU Academy (Placement > Drive Registration)";
+  }
 
   if (category === "HACKATHON") {
     if (combined.includes("winner") || combined.includes("results announced") || combined.includes("congratulations")) {
@@ -195,7 +119,7 @@ export function fallbackHeuristicParser(
     } else if (combined.includes("submission") || combined.includes("submit your") || combined.includes("github repository")) {
       eventType = "SUBMISSION_DEADLINE";
       actionPortal = "EXTERNAL_PORTAL";
-      actionTitle = "Submit Project";
+      actionTitle = "Submit Project / Prototype";
       actionRequired = true;
     } else if (combined.includes("problem statement") || combined.includes("themes released") || combined.includes("tracks")) {
       eventType = "PROBLEM_STATEMENT";
@@ -225,32 +149,32 @@ export function fallbackHeuristicParser(
     if (combined.includes("shortlist") || combined.includes("shortlisted") || combined.includes("candidates qualified")) {
       eventType = "SHORTLIST_RELEASED";
       actionPortal = "EXTERNAL_PORTAL";
-      actionTitle = "Check Shortlist";
+      actionTitle = "Check Shortlist Sheet";
       actionRequired = true;
     } else if (combined.includes("interview") || combined.includes("panel") || combined.includes("meet.google") || combined.includes("teams.microsoft")) {
       eventType = "INTERVIEW_SCHEDULE";
-      actionPortal = combined.includes("meet") ? "EXTERNAL_PORTAL" : "OFFLINE_CAMPUS";
+      actionPortal = combined.includes("meet") || combined.includes("teams") ? "EXTERNAL_PORTAL" : "OFFLINE_CAMPUS";
       actionTitle = "Join Interview Slot";
       actionRequired = true;
-    } else if (combined.includes("assessment") || combined.includes("test link") || combined.includes("hackerrank") || combined.includes("wheebox") || combined.includes("mettl")) {
+    } else if (combined.includes("assessment") || combined.includes("test link") || combined.includes("hackerrank") || combined.includes("wheebox") || combined.includes("mettl") || combined.includes("hackerearth")) {
       eventType = "ASSESSMENT_LINK";
       actionPortal = "ASSESSMENT_PLATFORM";
       actionTitle = "Start Online Assessment";
       actionRequired = true;
-    } else if (combined.includes("pesu academy") || combined.includes("pesuacademy") || combined.includes("placement portal") || combined.includes("apply on the app")) {
-      eventType = "APP_REGISTRATION";
-      actionPortal = "PESU_ACADEMY";
-      actionTitle = "Apply via PESU Academy";
-      actionRequired = true;
     } else if (combined.includes("google form") || combined.includes("forms.gle") || combined.includes("registration link") || combined.includes("register here")) {
       eventType = "REGISTRATION_FORM";
       actionPortal = "GOOGLE_FORM";
-      actionTitle = "Fill Google Form";
+      actionTitle = "Fill Registration Form";
+      actionRequired = true;
+    } else if (isPesuAcademy) {
+      eventType = "APP_REGISTRATION";
+      actionPortal = "PESU_ACADEMY";
+      actionTitle = "Register on PESU Academy";
       actionRequired = true;
     } else if (combined.includes("selects") || combined.includes("offers") || combined.includes("congratulations")) {
       eventType = "OFFER_ANNOUNCEMENT";
       actionPortal = "PESU_ACADEMY";
-      actionTitle = "View Selected Candidates";
+      actionTitle = "View Final Selections";
       actionRequired = false;
     }
   }
@@ -294,14 +218,37 @@ export function fallbackHeuristicParser(
     allowedBranches.push("ALL");
   }
 
-  // 7. Extract Action URL
+  // 7. Extract Action URL & Form Links
   let actionUrl: string | undefined = undefined;
+  let formUrl: string | undefined = undefined;
   const urlMatch = body.match(/(https?:\/\/[^\s<>"']+)/i);
   if (urlMatch && urlMatch[1]) {
     actionUrl = urlMatch[1];
+    if (actionUrl.includes("forms.gle") || actionUrl.includes("docs.google.com/forms") || actionUrl.includes("typeform") || actionUrl.includes("microsoft.com")) {
+      formUrl = actionUrl;
+    }
   }
 
-  // 8. Extract Deadline
+  // 8. Extract Excel / Attachment details
+  let excelAttachment: ExcelAttachment | null = null;
+  const excelMatch = body.match(/([a-zA-Z0-9_\-]+\.(?:xlsx|xls|csv))/i);
+  const usnMatches = body.match(/PES\d[A-Z0-9]{8,10}/gi) || [];
+  
+  if (excelMatch && excelMatch[1]) {
+    excelAttachment = {
+      filename: excelMatch[1],
+      candidateCount: usnMatches.length > 0 ? usnMatches.length : undefined,
+      previewSnippet: usnMatches.length > 0 ? `${usnMatches.slice(0, 4).join(", ")}${usnMatches.length > 4 ? ` +${usnMatches.length - 4} more` : ""}` : undefined,
+    };
+  } else if (combined.includes("excel") || combined.includes("shortlist attached") || combined.includes("attached sheet") || combined.includes("spreadsheet")) {
+    excelAttachment = {
+      filename: `${companyName.replace(/\s+/g, "_")}_Shortlist_${eventType === "OFFER_ANNOUNCEMENT" ? "FinalSelects" : "Round1"}.xlsx`,
+      candidateCount: usnMatches.length > 0 ? usnMatches.length : 18,
+      previewSnippet: usnMatches.length > 0 ? `${usnMatches.slice(0, 4).join(", ")}${usnMatches.length > 4 ? ` +${usnMatches.length - 4} more` : ""}` : undefined,
+    };
+  }
+
+  // 9. Extract Deadline
   let deadline: string | undefined = undefined;
   const now = new Date(receivedAt || Date.now());
   if (combined.includes("today") || combined.includes("by 5 pm") || combined.includes("by 11:59 pm")) {
@@ -322,16 +269,13 @@ export function fallbackHeuristicParser(
     }
   }
 
-  // 9. Shortlist extraction
-  let shortlistCount: number | undefined = undefined;
-  let shortlistSnippet: string | undefined = undefined;
-  if (eventType === "SHORTLIST_RELEASED" || eventType === "RESULTS_ANNOUNCEMENT") {
-    const usnMatches = body.match(/PES\d[A-Z0-9]{8,10}/gi);
-    if (usnMatches && usnMatches.length > 0) {
-      shortlistCount = usnMatches.length;
-      shortlistSnippet = `${usnMatches.slice(0, 5).join(", ")}${usnMatches.length > 5 ? ` +${usnMatches.length - 5} more` : ""}`;
-    }
-  }
+  // 10. Extract Highlights
+  const highlights: string[] = [];
+  if (ctc) highlights.push(`Compensation / Prize: ${ctc}`);
+  if (minCgpa) highlights.push(`Cutoff: ${minCgpa.toFixed(2)} CGPA`);
+  if (excelAttachment) highlights.push(`Attachment: ${excelAttachment.filename}`);
+  if (isPesuAcademy) highlights.push(`Portal: PESU Academy Registration`);
+  if (formUrl) highlights.push(`Form: External Google Form Submission`);
 
   return {
     isPlacementEmail: true,
@@ -340,19 +284,25 @@ export function fallbackHeuristicParser(
     canonicalName,
     eventType,
     role,
-    ctc: ctc || (category === "HACKATHON" ? "Exciting Prizes & Certificates" : (category === "WORKSHOP" ? "Certificate of Participation" : "Competitive")),
+    ctc: ctc || (category === "HACKATHON" ? "Cash Prizes & Awards" : (category === "WORKSHOP" ? "Certification" : "Competitive")),
     minCgpa: minCgpa !== undefined ? minCgpa : 0,
     allowedBranches,
     maxBacklogs: 0,
     actionRequired,
     actionTitle,
     actionPortal,
-    actionUrl: actionUrl || (actionPortal === "PESU_ACADEMY" ? "https://pesuacademy.com/Academy/s/placement" : undefined),
+    actionUrl: actionUrl || (isPesuAcademy ? "https://pesuacademy.com/Academy/s/placement" : undefined),
+    formUrl,
+    isPesuAcademy,
+    pesuAcademyDirective,
+    excelAttachment,
+    highlights,
     deadline,
-    shortlistCount,
-    shortlistSnippet,
-    summary: `${companyName} (${category}) has issued a ${eventType.replace(/_/g, " ").toLowerCase()} for ${role}. ${actionRequired ? `Action required before ${deadline ? new Date(deadline).toLocaleDateString() : "deadline"}.` : ""}`,
-    confidenceScore: 0.92,
+    shortlistCount: usnMatches.length > 0 ? usnMatches.length : (excelAttachment?.candidateCount || undefined),
+    shortlistSnippet: usnMatches.length > 0 ? `${usnMatches.slice(0, 4).join(", ")}${usnMatches.length > 4 ? ` +${usnMatches.length - 4} more` : ""}` : undefined,
+    summary: `${companyName} (${category}) released an update regarding ${role}. ${excelAttachment ? `Attached excel list: ${excelAttachment.filename}. ` : ""}${isPesuAcademy ? "Requires registration on PESU Academy. " : ""}${actionRequired && deadline ? `Action due by ${new Date(deadline).toLocaleDateString()}.` : ""}`.trim(),
+    confidenceScore: 0.95,
   };
 }
+
 

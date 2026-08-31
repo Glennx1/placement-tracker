@@ -85,6 +85,46 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
             </p>
           </div>
 
+          {/* Attached Excel Sheet if present */}
+          {event.excelAttachment && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-900 flex items-center gap-2">
+                  📊 Attached Excel Sheet: {event.excelAttachment.filename}
+                </span>
+                {event.excelAttachment.candidateCount && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-bold text-[10px]">
+                    {event.excelAttachment.candidateCount} Candidates
+                  </span>
+                )}
+              </div>
+              {event.excelAttachment.previewSnippet && (
+                <div className="p-2 rounded-lg bg-white border border-emerald-100 font-mono text-[11px] text-emerald-800">
+                  <strong>Shortlist Preview: </strong> {event.excelAttachment.previewSnippet}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PESU Academy Directive if present */}
+          {(event.isPesuAcademy || event.actionPortal === "PESU_ACADEMY") && (
+            <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-blue-900 font-bold">
+                <Building2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <span>{event.pesuAcademyDirective || "Action Required on PESU Academy Placement Portal"}</span>
+              </div>
+              <a
+                href="https://pesuacademy.com/Academy/s/placement"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs"
+              >
+                <span>Open PESU Academy</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+
           {/* Action Links & Deadline */}
           {(event.actionUrl || event.deadline) && (
             <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -100,7 +140,7 @@ export const EmailDetailModal: React.FC<EmailDetailModalProps> = ({
                   ) : (
                     <ExternalLink className="w-3.5 h-3.5" />
                   )}
-                  <span>Open Portal / Form</span>
+                  <span>{event.formUrl ? "Open Registration Form" : "Open Link / Form"}</span>
                 </a>
               )}
 

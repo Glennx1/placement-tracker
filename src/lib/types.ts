@@ -15,7 +15,7 @@ export type EventType =
   | "APP_REGISTRATION"     // PESU Academy / In-App
   | "REGISTRATION_FORM"    // External Google Form / Portal
   | "ASSESSMENT_LINK"      // OT / HackerRank / Wheebox / Test slots
-  | "SHORTLIST_RELEASED"   // Shortlist PDF / Candidate Table
+  | "SHORTLIST_RELEASED"   // Shortlist PDF / Candidate Table / Excel
   | "INTERVIEW_SCHEDULE"   // Interview slots / Panel links
   | "OFFER_ANNOUNCEMENT"   // Final Results & Offer Letters
   // Hackathon & Contest Stages
@@ -65,9 +65,18 @@ export interface ActionItem {
   priority: number; // 1 = High/Urgent (<24h), 2 = Medium, 3 = Normal
 }
 
+export interface ExcelAttachment {
+  filename: string;
+  url?: string;
+  candidateCount?: number;
+  previewSnippet?: string;
+  fileSize?: string;
+}
+
 export interface PlacementEvent {
   id: string;
   companyId: string;
+  mailIndex?: number; // e.g. 1 for m1, 2 for m2, 3 for m3
   eventType: EventType;
   subject: string;
   senderEmail: string;
@@ -75,6 +84,14 @@ export interface PlacementEvent {
   deadline?: string | null; // ISO string
   actionUrl?: string | null;
   actionPortal: ActionPortalType;
+  
+  // Specific important info
+  formUrl?: string | null;
+  isPesuAcademy?: boolean;
+  pesuAcademyDirective?: string | null;
+  excelAttachment?: ExcelAttachment | null;
+  highlights?: string[];
+  
   shortlistCount?: number | null;
   shortlistSnippet?: string | null;
   instructions?: string | null;
@@ -133,6 +150,13 @@ export interface GeminiExtractionResult {
   actionPortal: ActionPortalType;
   actionUrl?: string;
   deadline?: string; // ISO 8601 string or null
+  
+  excelAttachment?: ExcelAttachment | null;
+  formUrl?: string | null;
+  isPesuAcademy?: boolean;
+  pesuAcademyDirective?: string | null;
+  highlights?: string[];
+
   shortlistCount?: number;
   shortlistSnippet?: string;
   instructions?: string;
@@ -160,3 +184,4 @@ export interface FilterState {
   urgentOnly: boolean;
   status: "ALL" | DriveStatus;
 }
+

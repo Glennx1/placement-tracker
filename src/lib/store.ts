@@ -88,9 +88,11 @@ function createInitialState(): {
     }
 
     const eventId = `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const mailIndex = parentDrive.events.length + 1;
     const newEvent: PlacementEvent = {
       id: eventId,
       companyId: parentDrive.id,
+      mailIndex: email.mailIndex || mailIndex,
       eventType: extraction.eventType,
       subject: email.subject,
       senderEmail: email.sender,
@@ -98,6 +100,11 @@ function createInitialState(): {
       deadline: extraction.deadline || null,
       actionUrl: extraction.actionUrl || null,
       actionPortal: extraction.actionPortal,
+      formUrl: extraction.formUrl || null,
+      isPesuAcademy: extraction.isPesuAcademy || false,
+      pesuAcademyDirective: extraction.pesuAcademyDirective || null,
+      excelAttachment: email.excelAttachment || extraction.excelAttachment || null,
+      highlights: extraction.highlights || [],
       shortlistCount: extraction.shortlistCount || null,
       shortlistSnippet: extraction.shortlistSnippet || null,
       instructions: extraction.instructions || null,
@@ -278,11 +285,13 @@ class PlacementStore {
       }
     }
 
-    // 3. Create Child Lifecycle Event Node
+    // 3. Create Child Lifecycle Event Node with mail tree index
     const eventId = `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const mailIndex = parentDrive.events.length + 1;
     const newEvent: PlacementEvent = {
       id: eventId,
       companyId: parentDrive.id,
+      mailIndex,
       eventType: extraction.eventType,
       subject: email.subject,
       senderEmail: email.sender,
@@ -290,6 +299,11 @@ class PlacementStore {
       deadline: extraction.deadline || null,
       actionUrl: extraction.actionUrl || null,
       actionPortal: extraction.actionPortal,
+      formUrl: extraction.formUrl || null,
+      isPesuAcademy: extraction.isPesuAcademy || false,
+      pesuAcademyDirective: extraction.pesuAcademyDirective || null,
+      excelAttachment: extraction.excelAttachment || null,
+      highlights: extraction.highlights || [],
       shortlistCount: extraction.shortlistCount || null,
       shortlistSnippet: extraction.shortlistSnippet || null,
       instructions: extraction.instructions || null,
@@ -344,4 +358,5 @@ export const placementStore = globalStore.__placementStore || new PlacementStore
 if (process.env.NODE_ENV !== "production") {
   globalStore.__placementStore = placementStore;
 }
+
 
