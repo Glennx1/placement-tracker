@@ -25,113 +25,17 @@ export const DEFAULT_STUDENT_PROFILE: StudentProfile = {
   activeBacklogs: 0,
 };
 
-// Seed initial state with sample emails so the site is never blank
+// Initialize state with clean empty arrays - no placeholder mock emails
 function createInitialState(): {
   profile: StudentProfile;
   drives: CompanyDrive[];
   logs: IngestionLogEntry[];
 } {
-  const store = {
+  return {
     profile: { ...DEFAULT_STUDENT_PROFILE },
-    drives: [] as CompanyDrive[],
-    logs: [] as IngestionLogEntry[],
+    drives: [],
+    logs: [],
   };
-
-  // Seed sample drives synchronously using heuristic parser
-  const now = Date.now();
-  for (const email of SAMPLE_PES_EMAILS) {
-    const extraction = fallbackHeuristicParser(email.subject, email.sender, email.body, email.receivedAt);
-    const canonicalInfo = resolveCanonicalEntity(
-      extraction.companyName || extraction.canonicalName,
-      email.subject,
-      email.body
-    );
-
-    const canonicalName = canonicalInfo.canonicalName;
-    const displayName = extraction.companyName || canonicalInfo.name;
-    const category: Category = email.expectedCategory || canonicalInfo.category || "COMPANY";
-
-    let parentDrive = store.drives.find(
-      (d) => d.canonicalName.toLowerCase() === canonicalName.toLowerCase()
-    );
-
-    const isPastDeadline = extraction.deadline && new Date(extraction.deadline).getTime() < now;
-    const initialStatus: DriveStatus = isPastDeadline ? "EXPIRED" : "ACTIVE";
-
-    if (!parentDrive) {
-      parentDrive = {
-        id: `drive-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        name: displayName,
-        canonicalName,
-        category,
-        logoUrl: `https://logo.clearbit.com/${canonicalName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        role: extraction.role || (category === "HACKATHON" ? "Open Hackathon Track" : "Campus Opportunity"),
-        ctc: extraction.ctc || (category === "HACKATHON" ? "Cash Prizes & Awards" : "Competitive"),
-        stipend: extraction.stipend || null,
-        tier: (category === "HACKATHON" ? "COMPETITION" : (category === "WORKSHOP" ? "LEARNING" : (extraction.ctc && parseInt(extraction.ctc) >= 15 ? "TIER_1" : "TIER_2"))) as Tier,
-        minCgpa: extraction.minCgpa && extraction.minCgpa > 0 ? extraction.minCgpa : null,
-        allowedBranches: extraction.allowedBranches.length > 0 ? extraction.allowedBranches : ["ALL"],
-        maxBacklogs: extraction.maxBacklogs ?? 0,
-        status: initialStatus,
-        currentStage: extraction.eventType,
-        latestDeadline: extraction.deadline || null,
-        criteriaInfo: extraction.minCgpa && extraction.minCgpa > 0 ? `Cutoff: ${extraction.minCgpa} CGPA` : "Open to all students",
-        events: [],
-        actions: [],
-      };
-      store.drives.push(parentDrive);
-    } else {
-      parentDrive.currentStage = extraction.eventType;
-      if (extraction.deadline) {
-        parentDrive.latestDeadline = extraction.deadline;
-      }
-    }
-
-    const eventId = `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const mailIndex = parentDrive.events.length + 1;
-    const newEvent: PlacementEvent = {
-      id: eventId,
-      companyId: parentDrive.id,
-      mailIndex: email.mailIndex || mailIndex,
-      eventType: extraction.eventType,
-      subject: email.subject,
-      senderEmail: email.sender,
-      receivedAt: email.receivedAt,
-      deadline: extraction.deadline || null,
-      actionUrl: extraction.actionUrl || null,
-      actionPortal: extraction.actionPortal,
-      formUrl: extraction.formUrl || null,
-      isPesuAcademy: extraction.isPesuAcademy || false,
-      pesuAcademyDirective: extraction.pesuAcademyDirective || null,
-      excelAttachment: email.excelAttachment || extraction.excelAttachment || null,
-      highlights: extraction.highlights || [],
-      shortlistCount: extraction.shortlistCount || null,
-      shortlistSnippet: extraction.shortlistSnippet || null,
-      instructions: extraction.instructions || null,
-      summary: extraction.summary,
-      rawBody: email.body,
-      gmailMessageId: email.id,
-      llmConfidence: extraction.confidenceScore || 0.95,
-    };
-    parentDrive.events.push(newEvent);
-
-    if (extraction.actionRequired && extraction.actionTitle) {
-      const actionItem: ActionItem = {
-        id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        companyId: parentDrive.id,
-        eventId: newEvent.id,
-        title: extraction.actionTitle,
-        portalType: extraction.actionPortal,
-        link: extraction.actionUrl || null,
-        deadline: extraction.deadline || null,
-        isCompleted: Boolean(isPastDeadline),
-        priority: extraction.deadline && (new Date(extraction.deadline).getTime() - now < 24 * 3600 * 1000) ? 1 : 2,
-      };
-      parentDrive.actions.push(actionItem);
-    }
-  }
-
-  return store;
 }
 
 // Global in-memory singleton store

@@ -34,11 +34,13 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
 
   if (drives.length === 0) {
     return (
-      <div className="clean-card rounded-2xl p-12 text-center text-slate-500 my-6 bg-white border border-slate-200 shadow-sm">
-        <Inbox className="w-10 h-10 mx-auto mb-3 text-slate-400" />
-        <h3 className="text-base font-bold text-slate-800">No items match your filter</h3>
-        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-          Try resetting the category filter or use the Gmail Sync tab to ingest your latest emails.
+      <div className="clean-card rounded-2xl p-12 text-center text-slate-500 my-6 bg-white border border-slate-200 shadow-sm space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-600">
+          <Inbox className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-slate-800">No Tracked Emails Yet</h3>
+        <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+          Your dashboard is clean and ready. Run the Google Apps Script or Python script to pull all your emails from <strong>PESU_TRACKED</strong> or <strong>PESU_TAGGED</strong>.
         </p>
       </div>
     );
