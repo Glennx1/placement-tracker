@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Opportunities</span>
+            <span>Mail Tree</span>
           </button>
           <button
             onClick={() => setActiveView("actions")}

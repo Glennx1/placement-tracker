@@ -260,7 +260,7 @@ export default function PlacementTrackerDashboard() {
             {isLoading ? (
               <div className="py-20 text-center text-slate-400 text-xs font-medium">
                 <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
-                Loading opportunities...
+                Loading feeds...
               </div>
             ) : (
               <CompanyTree

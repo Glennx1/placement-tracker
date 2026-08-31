@@ -24,7 +24,7 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ drives }) => {
   ).length;
 
   const items = [
-    { label: "Total Opportunities", value: totalItems, highlight: "text-slate-900", badge: "bg-slate-100 text-slate-700" },
+    { label: "Total Tracked", value: totalItems, highlight: "text-slate-900", badge: "bg-slate-100 text-slate-700" },
     { label: "Company Drives", value: companiesCount, highlight: "text-blue-700", badge: "bg-blue-50 text-blue-700" },
     { label: "Hackathons", value: hackathonsCount, highlight: "text-purple-700", badge: "bg-purple-50 text-purple-700" },
     { label: "Workshops & Notices", value: workshopsCount, highlight: "text-amber-700", badge: "bg-amber-50 text-amber-700" },

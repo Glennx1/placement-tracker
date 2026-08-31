@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PES Campus Intelligence & Opportunities Tracker",
+  title: "PES Campus Intelligence & Communication Tracker",
   description:
     "AI-powered campus communication intelligence platform for @pes.edu emails with Gemini structured extraction, category bucketing (Companies, Hackathons, Workshops, Notices), and task checklists.",
 };

@@ -36,7 +36,7 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
     return (
       <div className="clean-card rounded-2xl p-12 text-center text-slate-500 my-6 bg-white border border-slate-200 shadow-sm">
         <Inbox className="w-10 h-10 mx-auto mb-3 text-slate-400" />
-        <h3 className="text-base font-bold text-slate-800">No opportunities match your filter</h3>
+        <h3 className="text-base font-bold text-slate-800">No items match your filter</h3>
         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
           Try resetting the category filter or use the Gmail Sync tab to ingest your latest emails.
         </p>
@@ -49,7 +49,7 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
       {/* Section Header & Sort */}
       <div className="flex items-center justify-between gap-2 px-1 text-xs">
         <span className="font-bold text-slate-700">
-          Tracked Opportunities ({drives.length})
+          Tracked Items ({drives.length})
         </span>
 
         <div className="flex items-center gap-1.5 text-xs text-slate-500">

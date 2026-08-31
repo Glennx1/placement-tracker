@@ -57,7 +57,7 @@ export const ActionChecklist: React.FC<ActionChecklistProps> = ({
             Action &amp; Registration Tasks
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            {pendingActions.length} pending task{pendingActions.length === 1 ? "" : "s"} across all opportunities
+            {pendingActions.length} pending task{pendingActions.length === 1 ? "" : "s"} across all drives &amp; contests
           </p>
         </div>
 

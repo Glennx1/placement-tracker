@@ -79,22 +79,95 @@ export const IngestionSimulator: React.FC<IngestionSimulatorProps> = ({
   };
 
   const googleAppsScriptCode = `/**
- * Google Apps Script for your personal @gmail.com account
- * Scans emails tagged with "PESU_TAGGED" (or from "@pes.edu") and posts them to your Tracker.
+ * PES Placement & Communication Tracker - Google Apps Script
+ * Automatically pulls ALL emails from PESU_TRACKED / PESU_TAGGED / @pes.edu
+ * from July onwards and streams them directly into your dashboard.
  *
- * Setup in 1 minute:
- * 1. Open https://script.google.com in your browser (signed in with your @gmail.com).
- * 2. Create a New Project, paste this code and Save.
- * 3. Replace APP_URL with your Vercel URL (e.g. https://placement-tracker-teal.vercel.app/api/parse-email).
- * 4. Add a Time-driven Trigger (Triggers icon -> Add Trigger -> Every 5 minutes).
+ * HOW TO RUN:
+ * 1. Open https://script.google.com and click "New Project".
+ * 2. Paste this entire code into Code.gs and click Save (Ctrl+S).
+ * 3. Select "syncAllHistoricEmails" from the dropdown and click "Run (▶)".
+ *    -> This will pull and sync ALL past emails into your dashboard!
+ * 4. To enable 24/7 background syncing for incoming emails:
+ *    -> Click Triggers (⏰ icon on the left) -> "Add Trigger" -> Select "syncPesEmails" -> Time-driven -> Every 5 minutes.
  */
 
-const APP_URL = "https://placement-tracker-teal.vercel.app/api/parse-email";
+const WEBHOOK_URL = "https://placement-tracker-teal.vercel.app/api/parse-email";
 
+// 1. RUN THIS ONCE TO PULL AND BACKFILL ALL PAST EMAILS
+function syncAllHistoricEmails() {
+  Logger.log("Starting full historic sync of all PES emails...");
+  
+  const queries = [
+    'label:PESU_TRACKED',
+    'label:pesu_tracked',
+    'label:PESU_TAGGED',
+    'label:pesu_tagged',
+    'from:(*@pes.edu)'
+  ];
+
+  let processedCount = 0;
+  let label = GmailApp.getUserLabelByName("TRACKED_TO_DASHBOARD");
+  if (!label) {
+    label = GmailApp.createLabel("TRACKED_TO_DASHBOARD");
+  }
+
+  for (let q = 0; q < queries.length; q++) {
+    const currentQuery = queries[q];
+    Logger.log("Searching: " + currentQuery);
+    
+    const threads = GmailApp.search(currentQuery, 0, 100);
+    Logger.log("Found " + threads.length + " threads for " + currentQuery);
+
+    for (let i = 0; i < threads.length; i++) {
+      const messages = threads[i].getMessages();
+      for (let j = 0; j < messages.length; j++) {
+        const msg = messages[j];
+        
+        // Extract attachment file names (.xlsx, .xls, .csv, .pdf)
+        const attachments = msg.getAttachments();
+        let attachmentNames = [];
+        for (let k = 0; k < attachments.length; k++) {
+          attachmentNames.push(attachments[k].getName());
+        }
+
+        let bodyText = msg.getPlainBody();
+        if (attachmentNames.length > 0) {
+          bodyText += "\\n\\n[Attached Files in Email: " + attachmentNames.join(", ") + "]";
+        }
+
+        const payload = {
+          subject: msg.getSubject(),
+          sender: msg.getFrom(),
+          body: bodyText,
+          receivedAt: msg.getDate().toISOString(),
+          gmailMessageId: msg.getId()
+        };
+
+        try {
+          const response = UrlFetchApp.fetch(WEBHOOK_URL, {
+            method: "post",
+            contentType: "application/json",
+            payload: JSON.stringify(payload),
+            muteHttpExceptions: true
+          });
+          processedCount++;
+          Logger.log("Synced [" + processedCount + "]: " + msg.getSubject() + " -> HTTP " + response.getResponseCode());
+        } catch (err) {
+          Logger.log("Error posting message: " + err);
+        }
+      }
+      threads[i].addLabel(label);
+    }
+  }
+
+  Logger.log("Completed! Total messages synced: " + processedCount);
+}
+
+// 2. AUTOMATIC TRIGGER FUNCTION (RUNS EVERY 5 MINUTES FOR NEW EMAILS)
 function syncPesEmails() {
-  // Search for emails tagged with PESU_TAGGED or from pes.edu that haven't been tracked yet
-  const query = 'label:PESU_TAGGED -label:TRACKED_TO_DASHBOARD';
-  const threads = GmailApp.search(query, 0, 20);
+  const query = '(label:PESU_TRACKED OR label:pesu_tracked OR label:PESU_TAGGED OR label:pesu_tagged OR from:(*@pes.edu)) -label:TRACKED_TO_DASHBOARD';
+  const threads = GmailApp.search(query, 0, 30);
   
   if (threads.length === 0) return;
 
@@ -108,24 +181,34 @@ function syncPesEmails() {
     for (let j = 0; j < messages.length; j++) {
       const msg = messages[j];
       
+      const attachments = msg.getAttachments();
+      let attachmentNames = [];
+      for (let k = 0; k < attachments.length; k++) {
+        attachmentNames.push(attachments[k].getName());
+      }
+
+      let bodyText = msg.getPlainBody();
+      if (attachmentNames.length > 0) {
+        bodyText += "\\n\\n[Attached Files in Email: " + attachmentNames.join(", ") + "]";
+      }
+
       const payload = {
         subject: msg.getSubject(),
         sender: msg.getFrom(),
-        body: msg.getPlainBody(),
+        body: bodyText,
         receivedAt: msg.getDate().toISOString(),
         gmailMessageId: msg.getId()
       };
 
       try {
-        const response = UrlFetchApp.fetch(APP_URL, {
+        UrlFetchApp.fetch(WEBHOOK_URL, {
           method: "post",
           contentType: "application/json",
           payload: JSON.stringify(payload),
           muteHttpExceptions: true
         });
-        Logger.log("Processed: " + msg.getSubject() + " -> " + response.getResponseCode());
       } catch (err) {
-        Logger.log("Error sending: " + err);
+        Logger.log("Error: " + err);
       }
     }
     threads[i].addLabel(label);
@@ -152,10 +235,10 @@ function syncPesEmails() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div>
           <h2 className="text-base font-bold text-slate-900">
-            Sync PES Emails (Gmail PESU_TAGGED Label &amp; Ingestion)
+            Sync PES Emails (Gmail PESU_TRACKED / PESU_TAGGED)
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Automated scanning script &amp; live AI test sandbox
+            Automated Google Apps Script &amp; Local Python Sync Engine
           </p>
         </div>
 
@@ -186,61 +269,65 @@ function syncPesEmails() {
 
       {activeTab === "how-it-works" ? (
         <div className="space-y-4 text-xs">
-          {/* Method 1: Local Python Scanner for PESU_TAGGED */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          {/* Method 1: Google Apps Script for 24/7 background sync */}
+          <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-200 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <Terminal className="w-4 h-4 text-indigo-600" />
-                  Option 1: Run Local Python Scanner (Streams from PESU_TAGGED)
-                </span>
-                <p className="text-slate-600 text-xs mt-0.5">
-                  Scans your Gmail account for the <strong>PESU_TAGGED</strong> label and streams all emails to your dashboard.
-                </p>
-              </div>
-
-              <button
-                onClick={copyPython}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1 text-xs font-semibold flex-shrink-0 shadow-xs"
-              >
-                {copiedPython ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedPython ? "Copied Command!" : "Copy Python Command"}</span>
-              </button>
-            </div>
-
-            <div className="p-3 rounded-lg bg-slate-900 text-emerald-400 font-mono text-xs overflow-x-auto">
-              <code>python scripts/sync_gmail_local.py --webhook https://placement-tracker-teal.vercel.app/api/parse-email</code>
-            </div>
-
-            <p className="text-[11px] text-slate-500">
-              The script will prompt for your Gmail and Google App Password (generate one in 30 seconds at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-indigo-600 font-semibold underline">myaccount.google.com/apppasswords</a>).
-            </p>
-          </div>
-
-          {/* Method 2: Google Apps Script for 24/7 background sync */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                <span className="font-bold text-indigo-950 text-sm flex items-center gap-1.5">
                   <Code2 className="w-4 h-4 text-indigo-600" />
-                  Option 2: Google Apps Script (24/7 Automated Cloud Forwarding)
+                  Option 1 (Recommended): Google Apps Script (Pulls Everything from PESU_TRACKED)
                 </span>
-                <p className="text-slate-600 text-xs mt-0.5">
-                  Runs continuously inside your Gmail account in the cloud every 5 minutes.
+                <p className="text-indigo-800 text-xs mt-0.5 font-medium">
+                  Runs directly inside your Google account. Has a <strong>syncAllHistoricEmails</strong> function to pull all past emails, plus a 5-minute recurring background sync.
                 </p>
               </div>
 
               <button
                 onClick={copyAppsScript}
-                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center gap-1 text-xs font-semibold flex-shrink-0 shadow-2xs"
+                className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1 text-xs font-bold flex-shrink-0 shadow-xs"
               >
-                {copiedScript ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedScript ? "Copied Code!" : "Copy Apps Script"}</span>
+                {copiedScript ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedScript ? "Copied Script!" : "Copy Google Apps Script"}</span>
               </button>
             </div>
 
-            <div className="p-3 rounded-lg bg-slate-900 text-slate-200 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-56">
+            <div className="p-3 rounded-lg bg-slate-900 text-slate-200 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-64">
               <pre>{googleAppsScriptCode}</pre>
+            </div>
+
+            <div className="p-3 rounded-lg bg-white border border-indigo-200 text-slate-700 text-xs space-y-1">
+              <strong>Quick 2-Step Instructions:</strong>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-600">
+                <li>Go to <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-indigo-600 underline font-semibold">script.google.com</a>, create a project, paste this code, and click Save.</li>
+                <li>Select <code>syncAllHistoricEmails</code> from the top dropdown and click <strong>Run (▶)</strong>. It will pull all your emails from <code>PESU_TRACKED</code> into the website!</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* Method 2: Local Python Scanner for PESU_TRACKED */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <Terminal className="w-4 h-4 text-indigo-600" />
+                  Option 2: Run Local Python Scanner from Terminal
+                </span>
+                <p className="text-slate-600 text-xs mt-0.5">
+                  Scans your Gmail account for <strong>PESU_TRACKED</strong>, <strong>PESU_TAGGED</strong>, or <strong>@pes.edu</strong> and syncs them.
+                </p>
+              </div>
+
+              <button
+                onClick={copyPython}
+                className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center gap-1 text-xs font-semibold flex-shrink-0 shadow-2xs"
+              >
+                {copiedPython ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedPython ? "Copied Command!" : "Copy Command"}</span>
+              </button>
+            </div>
+
+            <div className="p-3 rounded-lg bg-slate-900 text-emerald-400 font-mono text-xs overflow-x-auto">
+              <code>python scripts/sync_gmail_local.py --webhook https://placement-tracker-teal.vercel.app/api/parse-email</code>
             </div>
           </div>
         </div>
