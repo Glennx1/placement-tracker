@@ -1,3 +1,5 @@
+export type Category = "COMPANY" | "HACKATHON" | "WORKSHOP" | "NOTICE";
+
 export type DriveStatus =
   | "ACTIVE"
   | "APPLIED"
@@ -9,13 +11,23 @@ export type DriveStatus =
   | "EXPIRED";
 
 export type EventType =
+  // Company Placement Stages
   | "APP_REGISTRATION"     // PESU Academy / In-App
   | "REGISTRATION_FORM"    // External Google Form / Portal
   | "ASSESSMENT_LINK"      // OT / HackerRank / Wheebox / Test slots
   | "SHORTLIST_RELEASED"   // Shortlist PDF / Candidate Table
   | "INTERVIEW_SCHEDULE"   // Interview slots / Panel links
   | "OFFER_ANNOUNCEMENT"   // Final Results & Offer Letters
-  | "GENERAL_UPDATE";      // General announcement or schedule update
+  // Hackathon & Contest Stages
+  | "HACKATHON_REGISTRATION" // Team / Individual registration
+  | "PROBLEM_STATEMENT"      // Track / PS release
+  | "SUBMISSION_DEADLINE"    // Project / Prototype submission
+  | "FINALE_SCHEDULE"        // Pitching / Presentation / Demo round
+  | "RESULTS_ANNOUNCEMENT"   // Winners / Cash prize announcement
+  // Workshop & Academic Stages
+  | "WORKSHOP_REGISTRATION"  // Bootcamp / Seminar registration
+  | "SESSION_LINK"           // Meet / Zoom link & joining info
+  | "GENERAL_UPDATE";        // General announcement or schedule update
 
 export type ActionPortalType =
   | "PESU_ACADEMY"
@@ -25,7 +37,7 @@ export type ActionPortalType =
   | "OFFLINE_CAMPUS"
   | "EMAIL_REPLY";
 
-export type Tier = "TIER_1" | "TIER_2" | "TIER_3" | "MASS_HIRING";
+export type Tier = "TIER_1" | "TIER_2" | "TIER_3" | "MASS_HIRING" | "COMPETITION" | "LEARNING";
 
 export type EligibilityStatus = "ELIGIBLE" | "BORDERLINE" | "INELIGIBLE" | "NOT_SPECIFIED";
 
@@ -78,6 +90,7 @@ export interface CompanyDrive {
   id: string;
   name: string;
   canonicalName: string;
+  category: Category;
   logoUrl?: string | null;
   role: string;
   ctc: string;
@@ -93,16 +106,19 @@ export interface CompanyDrive {
   events: PlacementEvent[];
   actions: ActionItem[];
   
+  // Optional metadata / criteria string (non-blocking)
+  criteriaInfo?: string;
   // Computed client-side / enriched
   eligibility?: {
     status: EligibilityStatus;
     reason: string;
-    diff: number; // user CGPA - cutoff
+    diff: number;
   };
 }
 
 export interface GeminiExtractionResult {
   isPlacementEmail: boolean;
+  category: Category;
   companyName: string;
   canonicalName: string;
   eventType: EventType;
@@ -130,6 +146,7 @@ export interface IngestionLogEntry {
   sender: string;
   subject: string;
   parsedCompany?: string;
+  category?: Category;
   detectedEvent?: EventType;
   status: "SUCCESS" | "SKIPPED" | "FAILED";
   errorMessage?: string;
@@ -138,9 +155,8 @@ export interface IngestionLogEntry {
 
 export interface FilterState {
   search: string;
-  eligibility: "ALL" | EligibilityStatus;
+  category: "ALL" | Category;
   stage: "ALL" | EventType;
-  tier: "ALL" | Tier;
   urgentOnly: boolean;
   status: "ALL" | DriveStatus;
 }

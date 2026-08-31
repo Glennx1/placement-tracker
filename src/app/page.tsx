@@ -41,9 +41,8 @@ export default function PlacementTrackerDashboard() {
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
     search: "",
-    eligibility: "ALL",
+    category: "ALL",
     stage: "ALL",
-    tier: "ALL",
     urgentOnly: false,
     status: "ALL",
   });
@@ -68,7 +67,7 @@ export default function PlacementTrackerDashboard() {
     fetchData();
   }, []);
 
-  // Filtered drives calculation
+  // Filtered opportunities calculation
   const filteredDrives = useMemo(() => {
     return drives.filter((drive) => {
       // 1. Search
@@ -85,9 +84,10 @@ export default function PlacementTrackerDashboard() {
         }
       }
 
-      // 2. Eligibility
-      if (filters.eligibility !== "ALL") {
-        if (drive.eligibility?.status !== filters.eligibility) {
+      // 2. Category Bucket Filter
+      if (filters.category !== "ALL") {
+        const itemCategory = drive.category || "COMPANY";
+        if (itemCategory !== filters.category) {
           return false;
         }
       }
@@ -203,7 +203,7 @@ export default function PlacementTrackerDashboard() {
       if (json.success) {
         setProfile(json.data.profile);
         setDrives(json.data.allDrives);
-        setSyncToast("Profile and cutoffs updated.");
+        setSyncToast("Profile updated.");
         setTimeout(() => setSyncToast(null), 3000);
       }
     } catch (err) {
@@ -212,7 +212,7 @@ export default function PlacementTrackerDashboard() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0b0f17] text-gray-200">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased">
       {/* Top Navbar */}
       <Navbar
         profile={profile}
@@ -225,17 +225,17 @@ export default function PlacementTrackerDashboard() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-5">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6">
         {/* Toast Alert */}
         {syncToast && (
-          <div className="mb-4 p-2.5 rounded-lg bg-gray-900 border border-gray-700 text-xs text-gray-200 flex items-center justify-between shadow-sm">
+          <div className="mb-4 p-3 rounded-xl bg-white border border-emerald-200 text-xs text-slate-800 flex items-center justify-between shadow-sm animate-in fade-in">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
-              <span>{syncToast}</span>
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="font-semibold">{syncToast}</span>
             </div>
             <button
               onClick={() => setSyncToast(null)}
-              className="text-gray-500 hover:text-gray-300 text-[11px]"
+              className="text-slate-400 hover:text-slate-700 text-xs font-semibold"
             >
               Dismiss
             </button>
@@ -258,9 +258,9 @@ export default function PlacementTrackerDashboard() {
             />
 
             {isLoading ? (
-              <div className="py-16 text-center text-gray-500 text-xs">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-gray-400" />
-                Loading placement drives...
+              <div className="py-20 text-center text-slate-400 text-xs font-medium">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
+                Loading opportunities...
               </div>
             ) : (
               <CompanyTree
@@ -292,8 +292,8 @@ export default function PlacementTrackerDashboard() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-900 py-3 text-center text-[11px] text-gray-600">
-        PES University Placement Tracker • @pes.edu Email Intelligence
+      <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-500 bg-white">
+        PES Campus Tracker • Real-time intelligence for @pes.edu communication
       </footer>
 
       {/* Modals */}
@@ -312,3 +312,4 @@ export default function PlacementTrackerDashboard() {
     </div>
   );
 }
+

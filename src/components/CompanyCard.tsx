@@ -6,16 +6,15 @@ import {
   ChevronUp,
   Clock,
   ExternalLink,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Video,
-  Award,
   Eye,
   CheckSquare,
   Square,
+  Building2,
+  Trophy,
+  BookOpen,
+  Bell,
 } from "lucide-react";
-import { CompanyDrive, PlacementEvent, DriveStatus } from "@/lib/types";
+import { CompanyDrive, PlacementEvent, DriveStatus, Category } from "@/lib/types";
 
 interface CompanyCardProps {
   drive: CompanyDrive;
@@ -34,90 +33,112 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded);
 
-  const eligibility = drive.eligibility;
-  const isEligible = eligibility?.status === "ELIGIBLE" || eligibility?.status === "NOT_SPECIFIED";
   const now = Date.now();
   const isPastDeadline = drive.latestDeadline && new Date(drive.latestDeadline).getTime() < now;
   const isExpired = drive.status === "EXPIRED" || (drive.status === "ACTIVE" && isPastDeadline);
 
+  const getCategoryBadge = (category: Category) => {
+    switch (category) {
+      case "HACKATHON":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+            <Trophy className="w-3 h-3 text-purple-600" />
+            <span>Hackathon</span>
+          </span>
+        );
+      case "WORKSHOP":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+            <BookOpen className="w-3 h-3 text-amber-600" />
+            <span>Workshop</span>
+          </span>
+        );
+      case "NOTICE":
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1">
+            <Bell className="w-3 h-3 text-slate-500" />
+            <span>Notice</span>
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+            <Building2 className="w-3 h-3 text-blue-600" />
+            <span>Company</span>
+          </span>
+        );
+    }
+  };
+
   const getStatusBadge = (status: DriveStatus) => {
     if (isExpired) {
-      return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-800 text-gray-400 border border-gray-700">Expired / Closed</span>;
+      return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">Closed / Expired</span>;
     }
 
     switch (status) {
       case "OFFERED":
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">Offered 🎉</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">Offered / Won 🎉</span>;
       case "SHORTLISTED":
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-purple-950 text-purple-300 border border-purple-800">Shortlisted</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-300">Shortlisted</span>;
       case "INTERVIEW_SCHEDULED":
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-950 text-indigo-300 border border-indigo-800">Interview</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-100 text-indigo-800 border border-indigo-300">Interview</span>;
       case "APPLIED":
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-950 text-blue-300 border border-blue-800">Applied</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-300">Applied</span>;
       case "REJECTED":
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-red-950 text-red-300 border border-red-800">Rejected</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-300">Rejected</span>;
       case "EXPIRED":
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-800 text-gray-400 border border-gray-700">Expired</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">Expired</span>;
       default:
-        return <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-800 text-gray-300 border border-gray-700">Active</span>;
+        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>;
     }
   };
 
   return (
-    <div className={`clean-card clean-card-hover overflow-hidden ${isExpired ? "opacity-80" : ""}`}>
-      {/* Main Company Row */}
-      <div className="p-4">
+    <div className={`clean-card clean-card-hover overflow-hidden bg-white ${isExpired ? "opacity-75" : ""}`}>
+      {/* Main Row */}
+      <div className="p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Company Details */}
-          <div className="space-y-1">
+          {/* Details */}
+          <div className="space-y-1.5 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-bold text-sm text-white tracking-tight">
+              {getCategoryBadge(drive.category || "COMPANY")}
+              <h3 className="font-bold text-base text-slate-900 tracking-tight truncate">
                 {drive.name}
               </h3>
               {getStatusBadge(drive.status)}
-              <span className="text-[11px] text-gray-400 font-mono">
+              <span className="text-xs text-slate-600 font-mono font-semibold bg-slate-100 px-2 py-0.5 rounded">
                 {drive.ctc}
               </span>
             </div>
 
-            <p className="text-xs text-gray-300">
+            <p className="text-xs font-medium text-slate-600 line-clamp-1">
               {drive.role}
             </p>
 
-            {/* Meta Row: Eligibility & Cutoff */}
+            {/* Meta Row */}
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${
-                  isEligible
-                    ? "bg-emerald-950/40 border-emerald-800/60 text-emerald-300"
-                    : "bg-red-950/40 border-red-800/60 text-red-300"
-                }`}
-              >
-                {isEligible ? (
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                ) : (
-                  <AlertCircle className="w-3 h-3 text-red-400" />
-                )}
-                <span>
-                  {drive.minCgpa ? `Cutoff: ${drive.minCgpa.toFixed(2)}` : "No Cutoff"}
-                </span>
+              {/* Cutoff / Criteria Badge (Informative, non-blocking) */}
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                <span>{drive.criteriaInfo || (drive.minCgpa ? `Cutoff: ${drive.minCgpa.toFixed(2)} CGPA` : "Open to All")}</span>
               </span>
 
-              <span className="text-gray-500 text-[11px]">•</span>
+              <span className="text-slate-300">•</span>
 
-              <span className="text-gray-400 text-[11px]">
+              <span className="text-slate-500 text-[11px] font-medium">
                 {drive.events.length} email update{drive.events.length === 1 ? "" : "s"}
               </span>
 
               {drive.latestDeadline && (
                 <>
-                  <span className="text-gray-500 text-[11px]">•</span>
+                  <span className="text-slate-300">•</span>
                   <span
-                    className={`text-[11px] font-mono flex items-center gap-1 ${
-                      isPastDeadline ? "text-gray-500 line-through" : "text-amber-400/90"
+                    className={`text-[11px] font-mono font-semibold flex items-center gap-1 px-2 py-0.5 rounded ${
+                      isPastDeadline
+                        ? "text-slate-500 bg-slate-100 line-through"
+                        : "text-amber-800 bg-amber-50 border border-amber-200"
                     }`}
                   >
-                    <Clock className="w-2.5 h-2.5" />
+                    <Clock className="w-3 h-3 text-amber-600" />
                     {isPastDeadline ? "Closed " : "Due "}
                     {new Date(drive.latestDeadline).toLocaleDateString([], { month: "short", day: "numeric" })}
                   </span>
@@ -127,24 +148,24 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
           </div>
 
           {/* Quick Controls */}
-          <div className="flex items-center gap-2 self-start sm:self-center">
+          <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
             <select
               value={drive.status}
               onChange={(e) => onUpdateStatus(drive.id, e.target.value as DriveStatus)}
-              className="px-2 py-1 bg-gray-900 border border-gray-800 rounded-md text-xs text-gray-300 focus:outline-none focus:border-gray-700"
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-indigo-400 font-medium cursor-pointer"
             >
               <option value="ACTIVE">Active</option>
               <option value="APPLIED">Applied</option>
               <option value="SHORTLISTED">Shortlisted</option>
               <option value="INTERVIEW_SCHEDULED">Interview</option>
-              <option value="OFFERED">Offered 🎉</option>
+              <option value="OFFERED">Offered / Won 🎉</option>
               <option value="EXPIRED">Expired / Closed</option>
               <option value="REJECTED">Rejected</option>
             </select>
 
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1.5 px-2.5 rounded-md bg-gray-800 hover:bg-gray-750 text-gray-300 hover:text-white transition-colors text-xs font-medium flex items-center gap-1"
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors text-xs font-semibold flex items-center gap-1"
             >
               <span>{isExpanded ? "Hide" : "Timeline"}</span>
               {isExpanded ? (
@@ -159,66 +180,66 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
 
       {/* Expanded Timeline View */}
       {isExpanded && (
-        <div className="border-t border-gray-800/80 bg-gray-950/40 p-4 space-y-4 text-xs">
-          <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-            Email Lifecycle Timeline ({drive.events.length})
+        <div className="border-t border-slate-100 bg-slate-50/70 p-4 sm:p-5 space-y-4 text-xs">
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            Email &amp; Event Stream ({drive.events.length})
           </div>
 
-          <div className="space-y-3 pl-2 border-l border-gray-800">
+          <div className="space-y-3 pl-2 border-l-2 border-slate-200">
             {drive.events.map((event) => (
               <div key={event.id} className="relative pl-4 group">
-                {/* Bullet */}
-                <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-gray-950" />
+                {/* Timeline Bullet */}
+                <div className="absolute -left-[9px] top-2 w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow-xs" />
 
-                <div className="p-3 rounded-lg bg-gray-900/90 border border-gray-800/80 space-y-2">
+                <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.2 rounded bg-gray-800 text-gray-300 text-[10px] font-mono uppercase">
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold font-mono uppercase border border-indigo-100">
                         {event.eventType.replace(/_/g, " ")}
                       </span>
-                      <span className="font-semibold text-white text-xs">
+                      <span className="font-bold text-slate-900 text-xs">
                         {event.subject}
                       </span>
                     </div>
 
-                    <span className="text-[10px] text-gray-500 font-mono">
+                    <span className="text-[10px] text-slate-500 font-mono font-medium">
                       {new Date(event.receivedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                     </span>
                   </div>
 
-                  <p className="text-gray-300 text-xs leading-relaxed">
+                  <p className="text-slate-600 text-xs leading-relaxed">
                     {event.summary}
                   </p>
 
-                  {/* Shortlist Snippet if present */}
+                  {/* Shortlist / Result Snippet if present */}
                   {event.shortlistSnippet && (
-                    <div className="p-2 rounded bg-purple-950/30 border border-purple-900/40 text-[11px] text-purple-300 font-mono">
-                      <strong>Shortlisted: </strong> {event.shortlistSnippet}
+                    <div className="p-2.5 rounded-lg bg-purple-50 border border-purple-200 text-[11px] text-purple-900 font-mono">
+                      <strong>Results / Shortlist: </strong> {event.shortlistSnippet}
                     </div>
                   )}
 
                   {/* Action Link & Inspector */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-800/60">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
                     <div className="flex items-center gap-2">
                       {event.actionUrl && (
                         <a
                           href={event.actionUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className={`px-2.5 py-1 rounded text-white text-[11px] font-medium flex items-center gap-1 ${
-                            isPastDeadline ? "bg-gray-800 hover:bg-gray-700 text-gray-400" : "bg-blue-600 hover:bg-blue-500"
+                          className={`px-3 py-1 rounded-lg text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs transition-colors ${
+                            isPastDeadline ? "bg-slate-500 hover:bg-slate-600 text-white" : "bg-indigo-600 hover:bg-indigo-700"
                           }`}
                         >
                           <span>
                             {event.actionPortal === "PESU_ACADEMY"
-                              ? "PESU Academy"
-                              : "Open Form / Link"}
+                              ? "PESU Academy Portal"
+                              : "Open Link / Form"}
                           </span>
-                          <ExternalLink className="w-2.5 h-2.5" />
+                          <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
                       {event.deadline && (
-                        <span className={`text-[11px] font-mono ${isPastDeadline ? "text-gray-500" : "text-amber-400"}`}>
+                        <span className={`text-[11px] font-mono font-medium ${isPastDeadline ? "text-slate-500" : "text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200"}`}>
                           {isPastDeadline ? "Deadline was: " : "Deadline: "}
                           {new Date(event.deadline).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
@@ -227,10 +248,10 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
 
                     <button
                       onClick={() => onViewEventDetails(event, drive)}
-                      className="text-gray-400 hover:text-gray-200 text-[11px] flex items-center gap-1"
+                      className="text-slate-500 hover:text-indigo-600 text-[11px] font-medium flex items-center gap-1 transition-colors"
                     >
-                      <Eye className="w-3 h-3" />
-                      <span>View Email</span>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Inspect Raw Email</span>
                     </button>
                   </div>
                 </div>
@@ -238,27 +259,27 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
             ))}
           </div>
 
-          {/* Action Tasks */}
+          {/* Action Tasks Checklist */}
           {drive.actions.length > 0 && (
-            <div className="pt-2 border-t border-gray-800/60 space-y-1.5">
-              <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                Drive Tasks
+            <div className="pt-3 border-t border-slate-200 space-y-2">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Action Tasks
               </div>
               {drive.actions.map((act) => (
                 <div
                   key={act.id}
-                  className="flex items-center justify-between gap-2 p-2 rounded bg-gray-900/60 border border-gray-800 text-xs"
+                  className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-white border border-slate-200 text-xs shadow-xs"
                 >
                   <button
                     onClick={() => onToggleAction(act.id)}
-                    className="flex items-center gap-2 text-left min-w-0 flex-1"
+                    className="flex items-center gap-2.5 text-left min-w-0 flex-1"
                   >
                     {act.isCompleted ? (
-                      <CheckSquare className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      <CheckSquare className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                     ) : (
-                      <Square className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                      <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
                     )}
-                    <span className={act.isCompleted ? "line-through text-gray-500" : "text-gray-200"}>
+                    <span className={act.isCompleted ? "line-through text-slate-400 font-normal" : "text-slate-800 font-semibold"}>
                       {act.title}
                     </span>
                   </button>
@@ -267,10 +288,10 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
                       href={act.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[11px] text-blue-400 hover:underline flex items-center gap-0.5 flex-shrink-0"
+                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 flex-shrink-0"
                     >
-                      <span>Link</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
+                      <span>Open Link</span>
+                      <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
                 </div>
@@ -282,3 +303,4 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({
     </div>
   );
 };
+

@@ -1,35 +1,36 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GeminiExtractionResult, EventType, ActionPortalType } from "./types";
-import { resolveCanonicalCompany } from "./companyResolver";
+import { GeminiExtractionResult, EventType, ActionPortalType, Category } from "./types";
+import { resolveCanonicalEntity } from "./companyResolver";
 
 const GEMINI_SYSTEM_INSTRUCTION = `
-You are an expert AI Placement Classifier and Information Extraction engine specializing in parsing university placement emails from "@pes.edu" (PES University Placement Cell).
+You are an expert AI Placement Classifier and Information Extraction engine specializing in parsing university emails from "@pes.edu" (PES University).
 
 Analyze the provided email subject, sender, and body carefully and extract structured data conforming strictly to the requested JSON schema.
 
-Placement Email Categories at PES University:
-1. APP_REGISTRATION: Student must register directly via the college portal (e.g., PESU Academy / Placement App).
-2. REGISTRATION_FORM: Student must fill out an external link or Google Form / Company Careers link by a strict deadline.
-3. ASSESSMENT_LINK: Online test (OT) announcement, HackerRank/Wheebox/Mettl/Cocubes links, login credentials, or slot timings.
-4. SHORTLIST_RELEASED: List of candidates shortlisted after test or previous rounds, attachment references, USN list.
-5. INTERVIEW_SCHEDULE: Date, time slot, panel link (Zoom/Meet/Teams), offline venue, instructions.
-6. OFFER_ANNOUNCEMENT: Final select list, accepted offers, CTC and joining details.
-7. GENERAL_UPDATE: General announcement, reschedule, or guidelines.
+Category Buckets:
+1. COMPANY: Campus recruitment drives, job applications, internships, online assessments, interviews, job offers.
+2. HACKATHON: Hackathons, coding contests, ideathons, design challenges, competitions (e.g., SIH, Flipkart GRiD, Devfolio hackathons, HashCode).
+3. WORKSHOP: Technical bootcamps, masterclasses, webinars, guest lectures, training sessions.
+4. NOTICE: General university announcements, placement policies, exam guidelines, circulars.
+
+Event Types:
+- Company: APP_REGISTRATION, REGISTRATION_FORM, ASSESSMENT_LINK, SHORTLIST_RELEASED, INTERVIEW_SCHEDULE, OFFER_ANNOUNCEMENT, GENERAL_UPDATE
+- Hackathon: HACKATHON_REGISTRATION, PROBLEM_STATEMENT, SUBMISSION_DEADLINE, SHORTLIST_RELEASED, FINALE_SCHEDULE, RESULTS_ANNOUNCEMENT, GENERAL_UPDATE
+- Workshop: WORKSHOP_REGISTRATION, SESSION_LINK, GENERAL_UPDATE
+- Notice: GENERAL_UPDATE
 
 Extraction Rules:
-- Company Name: Extract the actual hiring company (e.g., "Goldman Sachs", "Cisco", "Akamai").
-- Canonical Name: Standardize to the base parent company name.
-- Event Type: Pick exactly one from [APP_REGISTRATION, REGISTRATION_FORM, ASSESSMENT_LINK, SHORTLIST_RELEASED, INTERVIEW_SCHEDULE, OFFER_ANNOUNCEMENT, GENERAL_UPDATE].
-- Role: Title of role (e.g. "Software Engineer - SDE 1", "Summer Analyst 2026", "Firmware Engineer").
-- CTC / Stipend: Extract compensation like "28 LPA" or "1.5 Lakhs/month" if mentioned.
-- minCgpa: Minimum CGPA number (e.g., 7.5, 8.0, 7.0, 6.75). If none mentioned, return 0.
-- allowedBranches: Array of branches mentioned (e.g. ["CSE", "ISE", "ECE", "EEE", "AIML"]). Default to ["CSE", "ISE", "ECE"] if circuital or all engineers.
-- Action Required: True if the student must take an action (fill form, attend test, check shortlist, confirm interview).
-- Action Title: Brief label for button (e.g., "Register on PESU Academy", "Submit Google Form", "Start HackerRank Test").
+- Category: Pick one from [COMPANY, HACKATHON, WORKSHOP, NOTICE].
+- Company / Entity Name: Extract the hiring company, hackathon name, workshop title, or notice subject.
+- Canonical Name: Standardize to the primary entity name.
+- Event Type: Pick the most appropriate EventType.
+- Role / Theme: Title of role, hackathon theme, or workshop subject.
+- CTC / Prize: Extract compensation (e.g. "28.5 LPA") or prize money (e.g. "₹1,00,000 Cash Prize").
+- Action Required: True if student must take an action (fill form, submit project, take test, attend).
+- Action Title: Brief label for button (e.g., "Register on PESU Academy", "Submit Hackathon Project", "Start Assessment").
 - Action Portal: One of [PESU_ACADEMY, GOOGLE_FORM, EXTERNAL_PORTAL, ASSESSMENT_PLATFORM, OFFLINE_CAMPUS, EMAIL_REPLY].
-- Action URL: Link to form/test/shortlist if present.
-- Deadline: Strict ISO-8601 timestamp string if deadline is mentioned. If relative like "Tomorrow 5 PM", calculate relative to email date or return closest realistic timestamp.
-- Shortlist Count & Snippet: If a shortlist is provided, count the names or USNs and extract a concise snippet.
+- Action URL: Link to form/test/submission if present.
+- Deadline: Strict ISO-8601 timestamp string if deadline is mentioned.
 - Summary: A crisp 2-sentence summary highlighting the core action and deadline for the student.
 `;
 
@@ -37,6 +38,10 @@ const extractionSchema = {
   type: SchemaType.OBJECT,
   properties: {
     isPlacementEmail: { type: SchemaType.BOOLEAN },
+    category: {
+      type: SchemaType.STRING,
+      enum: ["COMPANY", "HACKATHON", "WORKSHOP", "NOTICE"],
+    },
     companyName: { type: SchemaType.STRING },
     canonicalName: { type: SchemaType.STRING },
     eventType: {
@@ -48,6 +53,13 @@ const extractionSchema = {
         "SHORTLIST_RELEASED",
         "INTERVIEW_SCHEDULE",
         "OFFER_ANNOUNCEMENT",
+        "HACKATHON_REGISTRATION",
+        "PROBLEM_STATEMENT",
+        "SUBMISSION_DEADLINE",
+        "FINALE_SCHEDULE",
+        "RESULTS_ANNOUNCEMENT",
+        "WORKSHOP_REGISTRATION",
+        "SESSION_LINK",
         "GENERAL_UPDATE",
       ],
     },
@@ -83,6 +95,7 @@ const extractionSchema = {
   },
   required: [
     "isPlacementEmail",
+    "category",
     "companyName",
     "eventType",
     "role",
@@ -128,9 +141,14 @@ ${params.body}
       const parsed = JSON.parse(rawText) as GeminiExtractionResult;
 
       // Post-process with canonical resolution
-      const canonicalInfo = resolveCanonicalCompany(parsed.companyName || parsed.canonicalName || "");
+      const canonicalInfo = resolveCanonicalEntity(
+        parsed.companyName || parsed.canonicalName || "",
+        params.subject,
+        params.body
+      );
       parsed.canonicalName = canonicalInfo.canonicalName;
       if (!parsed.companyName) parsed.companyName = canonicalInfo.name;
+      parsed.category = parsed.category || canonicalInfo.category;
 
       return parsed;
     } catch (err) {
@@ -143,7 +161,7 @@ ${params.body}
 }
 
 /**
- * Intelligent Fallback Heuristic Parser specifically designed for @pes.edu placement emails
+ * Intelligent Fallback Heuristic Parser specifically designed for @pes.edu emails
  */
 export function fallbackHeuristicParser(
   subject: string,
@@ -153,30 +171,11 @@ export function fallbackHeuristicParser(
 ): GeminiExtractionResult {
   const combined = `${subject} ${body}`.toLowerCase();
   
-  // 1. Detect Company
-  let companyName = "Unknown Drive";
-  const commonCompanies = [
-    "Goldman Sachs", "Cisco", "Akamai", "Microsoft", "Amazon", "Google",
-    "Atlassian", "Morgan Stanley", "Texas Instruments", "Qualcomm", "Nvidia",
-    "Oracle", "Intuit", "Salesforce", "Adobe", "Walmart", "SAP Labs", "Target",
-    "JP Morgan", "Schneider Electric", "Mercedes-Benz", "Siemens", "Bosch"
-  ];
-
-  for (const c of commonCompanies) {
-    if (combined.includes(c.toLowerCase())) {
-      companyName = c;
-      break;
-    }
-  }
-
-  if (companyName === "Unknown Drive") {
-    const subjectCompanyMatch = subject.match(/(?:Drive|Hiring|Registration|Shortlist|Results|Campus|Placement)[\s:-]+([A-Za-z0-9\s&]+)/i);
-    if (subjectCompanyMatch && subjectCompanyMatch[1]) {
-      companyName = subjectCompanyMatch[1].trim().split(" ")[0];
-    }
-  }
-
-  const { canonicalName } = resolveCanonicalCompany(companyName);
+  // 1. Detect Entity and Category
+  const entityInfo = resolveCanonicalEntity("", subject, body);
+  const companyName = entityInfo.name;
+  const canonicalName = entityInfo.canonicalName;
+  const category: Category = entityInfo.category;
 
   // 2. Detect Event Type
   let eventType: EventType = "GENERAL_UPDATE";
@@ -184,56 +183,99 @@ export function fallbackHeuristicParser(
   let actionTitle = "View Details";
   let actionRequired = false;
 
-  if (combined.includes("shortlist") || combined.includes("shortlisted") || combined.includes("candidates qualified")) {
-    eventType = "SHORTLIST_RELEASED";
-    actionPortal = "EXTERNAL_PORTAL";
-    actionTitle = "Check Shortlist";
-    actionRequired = true;
-  } else if (combined.includes("interview") || combined.includes("panel") || combined.includes("meet.google") || combined.includes("teams.microsoft")) {
-    eventType = "INTERVIEW_SCHEDULE";
-    actionPortal = combined.includes("meet") ? "EXTERNAL_PORTAL" : "OFFLINE_CAMPUS";
-    actionTitle = "Join Interview Slot";
-    actionRequired = true;
-  } else if (combined.includes("assessment") || combined.includes("test link") || combined.includes("hackerrank") || combined.includes("wheebox") || combined.includes("mettl")) {
-    eventType = "ASSESSMENT_LINK";
-    actionPortal = "ASSESSMENT_PLATFORM";
-    actionTitle = "Start Online Assessment";
-    actionRequired = true;
-  } else if (combined.includes("pesu academy") || combined.includes("pesuacademy") || combined.includes("placement portal") || combined.includes("apply on the app")) {
-    eventType = "APP_REGISTRATION";
-    actionPortal = "PESU_ACADEMY";
-    actionTitle = "Apply via PESU Academy";
-    actionRequired = true;
-  } else if (combined.includes("google form") || combined.includes("forms.gle") || combined.includes("registration link") || combined.includes("register here")) {
-    eventType = "REGISTRATION_FORM";
-    actionPortal = "GOOGLE_FORM";
-    actionTitle = "Fill Google Form";
-    actionRequired = true;
-  } else if (combined.includes("selects") || combined.includes("offers") || combined.includes("congratulations")) {
-    eventType = "OFFER_ANNOUNCEMENT";
-    actionPortal = "PESU_ACADEMY";
-    actionTitle = "View Selected Candidates";
-    actionRequired = false;
+  if (category === "HACKATHON") {
+    if (combined.includes("winner") || combined.includes("results announced") || combined.includes("congratulations")) {
+      eventType = "RESULTS_ANNOUNCEMENT";
+      actionTitle = "View Winners";
+    } else if (combined.includes("finale") || combined.includes("pitch") || combined.includes("presentation")) {
+      eventType = "FINALE_SCHEDULE";
+      actionPortal = "OFFLINE_CAMPUS";
+      actionTitle = "Check Finale Schedule";
+      actionRequired = true;
+    } else if (combined.includes("submission") || combined.includes("submit your") || combined.includes("github repository")) {
+      eventType = "SUBMISSION_DEADLINE";
+      actionPortal = "EXTERNAL_PORTAL";
+      actionTitle = "Submit Project";
+      actionRequired = true;
+    } else if (combined.includes("problem statement") || combined.includes("themes released") || combined.includes("tracks")) {
+      eventType = "PROBLEM_STATEMENT";
+      actionPortal = "EXTERNAL_PORTAL";
+      actionTitle = "View Problem Statements";
+      actionRequired = true;
+    } else {
+      eventType = "HACKATHON_REGISTRATION";
+      actionPortal = combined.includes("unstop") || combined.includes("devfolio") ? "EXTERNAL_PORTAL" : "GOOGLE_FORM";
+      actionTitle = "Register for Hackathon";
+      actionRequired = true;
+    }
+  } else if (category === "WORKSHOP") {
+    if (combined.includes("meet.google") || combined.includes("teams.microsoft") || combined.includes("zoom.us")) {
+      eventType = "SESSION_LINK";
+      actionPortal = "EXTERNAL_PORTAL";
+      actionTitle = "Join Live Session";
+      actionRequired = true;
+    } else {
+      eventType = "WORKSHOP_REGISTRATION";
+      actionPortal = combined.includes("forms.gle") ? "GOOGLE_FORM" : "EXTERNAL_PORTAL";
+      actionTitle = "Register for Workshop";
+      actionRequired = true;
+    }
+  } else {
+    // Placement Drive Events
+    if (combined.includes("shortlist") || combined.includes("shortlisted") || combined.includes("candidates qualified")) {
+      eventType = "SHORTLIST_RELEASED";
+      actionPortal = "EXTERNAL_PORTAL";
+      actionTitle = "Check Shortlist";
+      actionRequired = true;
+    } else if (combined.includes("interview") || combined.includes("panel") || combined.includes("meet.google") || combined.includes("teams.microsoft")) {
+      eventType = "INTERVIEW_SCHEDULE";
+      actionPortal = combined.includes("meet") ? "EXTERNAL_PORTAL" : "OFFLINE_CAMPUS";
+      actionTitle = "Join Interview Slot";
+      actionRequired = true;
+    } else if (combined.includes("assessment") || combined.includes("test link") || combined.includes("hackerrank") || combined.includes("wheebox") || combined.includes("mettl")) {
+      eventType = "ASSESSMENT_LINK";
+      actionPortal = "ASSESSMENT_PLATFORM";
+      actionTitle = "Start Online Assessment";
+      actionRequired = true;
+    } else if (combined.includes("pesu academy") || combined.includes("pesuacademy") || combined.includes("placement portal") || combined.includes("apply on the app")) {
+      eventType = "APP_REGISTRATION";
+      actionPortal = "PESU_ACADEMY";
+      actionTitle = "Apply via PESU Academy";
+      actionRequired = true;
+    } else if (combined.includes("google form") || combined.includes("forms.gle") || combined.includes("registration link") || combined.includes("register here")) {
+      eventType = "REGISTRATION_FORM";
+      actionPortal = "GOOGLE_FORM";
+      actionTitle = "Fill Google Form";
+      actionRequired = true;
+    } else if (combined.includes("selects") || combined.includes("offers") || combined.includes("congratulations")) {
+      eventType = "OFFER_ANNOUNCEMENT";
+      actionPortal = "PESU_ACADEMY";
+      actionTitle = "View Selected Candidates";
+      actionRequired = false;
+    }
   }
 
-  // 3. Extract Role
-  let role = "Software Development Engineer";
-  const roleMatch = body.match(/(?:Role|Position|Job Title|Designation)\s*[:\-]\s*([A-Za-z0-9\s/_\-–]+)/i);
+  // 3. Extract Role / Topic
+  let role = category === "HACKATHON" ? "Open Hackathon Track" : (category === "WORKSHOP" ? "Hands-on Technical Bootcamp" : "Software Development Engineer");
+  const roleMatch = body.match(/(?:Role|Position|Job Title|Designation|Track|Theme|Topic)\s*[:\-]\s*([A-Za-z0-9\s/_\-–]+)/i);
   if (roleMatch && roleMatch[1]) {
-    role = roleMatch[1].trim().split("\n")[0].substring(0, 40);
+    role = roleMatch[1].trim().split("\n")[0].substring(0, 45);
   }
 
-  // 4. Extract CTC
+  // 4. Extract CTC / Cash Prize / Stipend
   let ctc: string | undefined = undefined;
-  const ctcMatch = body.match(/(?:CTC|Package|Compensation|Stipend|Salary)\s*[:\-]\s*([A-Za-z0-9\s.,/LPA–]+)/i);
+  const ctcMatch = body.match(/(?:CTC|Package|Compensation|Stipend|Salary|Prize Pool|Cash Prize|Awards)\s*[:\-]\s*([A-Za-z0-9\s.,/LPA–₹$]+)/i);
   if (ctcMatch && ctcMatch[1]) {
-    ctc = ctcMatch[1].trim().split("\n")[0].substring(0, 25);
+    ctc = ctcMatch[1].trim().split("\n")[0].substring(0, 30);
   } else if (combined.includes("lpa")) {
     const lpaMatch = body.match(/(\d+(?:\.\d+)?\s*LPA)/i);
     if (lpaMatch) ctc = lpaMatch[1];
+  } else if (category === "HACKATHON" && combined.includes("prize")) {
+    const prizeMatch = body.match(/(?:₹|Rs\.?|\$)\s*[\d,]+(?:\s*(?:Lakh|Lakhs|K))?/i);
+    if (prizeMatch) ctc = prizeMatch[0] + " Prize";
   }
 
-  // 5. Extract CGPA Cutoff
+  // 5. Extract CGPA Cutoff (informational)
   let minCgpa: number | undefined = undefined;
   const cgpaMatch = body.match(/(?:CGPA|GPA|Cutoff|Cut-off|Eligibility)\s*[:\-]?\s*(?:>=|above|minimum|min)?\s*(\d\.\d{1,2})/i);
   if (cgpaMatch && cgpaMatch[1]) {
@@ -249,7 +291,7 @@ export function fallbackHeuristicParser(
     }
   }
   if (allowedBranches.length === 0) {
-    allowedBranches.push("CSE", "ISE", "ECE");
+    allowedBranches.push("ALL");
   }
 
   // 7. Extract Action URL
@@ -272,7 +314,6 @@ export function fallbackHeuristicParser(
     d.setHours(17, 0, 0, 0);
     deadline = d.toISOString();
   } else {
-    // Default deadline 2 days from received date if registration or test
     if (actionRequired) {
       const d = new Date(now);
       d.setDate(d.getDate() + 2);
@@ -284,25 +325,23 @@ export function fallbackHeuristicParser(
   // 9. Shortlist extraction
   let shortlistCount: number | undefined = undefined;
   let shortlistSnippet: string | undefined = undefined;
-  if (eventType === "SHORTLIST_RELEASED") {
+  if (eventType === "SHORTLIST_RELEASED" || eventType === "RESULTS_ANNOUNCEMENT") {
     const usnMatches = body.match(/PES\d[A-Z0-9]{8,10}/gi);
     if (usnMatches && usnMatches.length > 0) {
       shortlistCount = usnMatches.length;
       shortlistSnippet = `${usnMatches.slice(0, 5).join(", ")}${usnMatches.length > 5 ? ` +${usnMatches.length - 5} more` : ""}`;
-    } else {
-      shortlistCount = 14;
-      shortlistSnippet = "14 students shortlisted for Technical Round 1 (See attached list)";
     }
   }
 
   return {
     isPlacementEmail: true,
+    category,
     companyName,
     canonicalName,
     eventType,
     role,
-    ctc: ctc || "Competitive (Placement Cell)",
-    minCgpa: minCgpa !== undefined ? minCgpa : 7.0,
+    ctc: ctc || (category === "HACKATHON" ? "Exciting Prizes & Certificates" : (category === "WORKSHOP" ? "Certificate of Participation" : "Competitive")),
+    minCgpa: minCgpa !== undefined ? minCgpa : 0,
     allowedBranches,
     maxBacklogs: 0,
     actionRequired,
@@ -312,7 +351,8 @@ export function fallbackHeuristicParser(
     deadline,
     shortlistCount,
     shortlistSnippet,
-    summary: `${companyName} has issued a ${eventType.replace(/_/g, " ").toLowerCase()} for ${role}. ${actionRequired ? `Action required before ${deadline ? new Date(deadline).toLocaleDateString() : "deadline"}.` : ""}`,
+    summary: `${companyName} (${category}) has issued a ${eventType.replace(/_/g, " ").toLowerCase()} for ${role}. ${actionRequired ? `Action required before ${deadline ? new Date(deadline).toLocaleDateString() : "deadline"}.` : ""}`,
     confidenceScore: 0.92,
   };
 }
+

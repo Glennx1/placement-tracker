@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { CompanyDrive, PlacementEvent, DriveStatus } from "@/lib/types";
 import { CompanyCard } from "./CompanyCard";
-import { ArrowUpDown, Inbox } from "lucide-react";
+import { Inbox, ArrowUpDown } from "lucide-react";
 
 interface CompanyTreeProps {
   drives: CompanyDrive[];
@@ -34,11 +34,11 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
 
   if (drives.length === 0) {
     return (
-      <div className="clean-card rounded-xl p-10 text-center text-gray-500 my-6">
-        <Inbox className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-        <h3 className="text-sm font-semibold text-gray-300">No drives match your filters</h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Adjust the filters above or use the Ingestion tab to test adding a new email.
+      <div className="clean-card rounded-2xl p-12 text-center text-slate-500 my-6 bg-white border border-slate-200 shadow-sm">
+        <Inbox className="w-10 h-10 mx-auto mb-3 text-slate-400" />
+        <h3 className="text-base font-bold text-slate-800">No opportunities match your filter</h3>
+        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          Try resetting the category filter or use the Gmail Sync tab to ingest your latest emails.
         </p>
       </div>
     );
@@ -48,38 +48,41 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
     <div className="space-y-3 mb-8">
       {/* Section Header & Sort */}
       <div className="flex items-center justify-between gap-2 px-1 text-xs">
-        <span className="font-semibold text-gray-300">
-          Company Drives ({drives.length})
+        <span className="font-bold text-slate-700">
+          Tracked Opportunities ({drives.length})
         </span>
 
-        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-          <span className="text-[11px] text-gray-500">Sort:</span>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+            <ArrowUpDown className="w-3 h-3" />
+            Sort by:
+          </span>
           <button
             onClick={() => setSortBy("urgent")}
-            className={`px-2 py-0.5 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
               sortBy === "urgent"
-                ? "bg-gray-800 text-white font-medium"
-                : "text-gray-400 hover:text-gray-200"
+                ? "bg-slate-200 text-slate-900 font-bold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Deadlines
           </button>
           <button
             onClick={() => setSortBy("events")}
-            className={`px-2 py-0.5 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
               sortBy === "events"
-                ? "bg-gray-800 text-white font-medium"
-                : "text-gray-400 hover:text-gray-200"
+                ? "bg-slate-200 text-slate-900 font-bold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            Timeline Depth
+            Updates
           </button>
           <button
             onClick={() => setSortBy("name")}
-            className={`px-2 py-0.5 rounded transition-colors ${
+            className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
               sortBy === "name"
-                ? "bg-gray-800 text-white font-medium"
-                : "text-gray-400 hover:text-gray-200"
+                ? "bg-slate-200 text-slate-900 font-bold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Name
@@ -88,7 +91,7 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
       </div>
 
       {/* Cards List */}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {sortedDrives.map((drive, idx) => (
           <CompanyCard
             key={drive.id}
@@ -103,3 +106,4 @@ export const CompanyTree: React.FC<CompanyTreeProps> = ({
     </div>
   );
 };
+

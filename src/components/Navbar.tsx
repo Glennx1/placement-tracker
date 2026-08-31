@@ -5,10 +5,10 @@ import {
   GraduationCap,
   RefreshCw,
   Sliders,
-  Mail,
   CheckCircle2,
   Layers,
   Inbox,
+  Sparkles,
 } from "lucide-react";
 import { StudentProfile } from "@/lib/types";
 
@@ -32,59 +32,62 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveView,
 }) => {
   return (
-    <header className="sticky top-0 z-30 bg-[#0b0f17]/90 backdrop-blur-md border-b border-gray-800/80 px-4 sm:px-8 py-3">
+    <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3 transition-colors">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
         {/* Brand */}
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-            <GraduationCap className="w-4 h-4" />
+          <div className="h-9 w-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-sm">
+            <GraduationCap className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-semibold text-sm text-white tracking-tight">
-                PES Placement Tracker
+              <h1 className="font-bold text-sm text-slate-900 tracking-tight">
+                PES Campus Tracker
               </h1>
-              <span className="text-[10px] font-medium text-gray-400 bg-gray-800/70 px-1.5 py-0.2 rounded border border-gray-700/50">
-                @pes.edu
+              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                @pes.edu Intelligence
               </span>
             </div>
+            <p className="text-[11px] text-slate-500 hidden sm:block">
+              Companies • Hackathons • Workshops • Notices
+            </p>
           </div>
         </div>
 
         {/* View Navigation Tabs */}
-        <nav className="flex items-center p-0.5 bg-gray-900/90 rounded-lg border border-gray-800 text-xs">
+        <nav className="flex items-center p-1 bg-slate-100/90 rounded-xl border border-slate-200 text-xs">
           <button
             onClick={() => setActiveView("drives")}
-            className={`px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
               activeView === "drives"
-                ? "bg-gray-800 text-white shadow-sm"
-                : "text-gray-400 hover:text-gray-200"
+                ? "bg-white text-indigo-700 shadow-sm font-semibold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Drives</span>
+            <span>Opportunities</span>
           </button>
           <button
             onClick={() => setActiveView("actions")}
-            className={`px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
               activeView === "actions"
-                ? "bg-gray-800 text-white shadow-sm"
-                : "text-gray-400 hover:text-gray-200"
+                ? "bg-white text-indigo-700 shadow-sm font-semibold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Checklist</span>
+            <span>Tasks</span>
           </button>
           <button
             onClick={() => setActiveView("simulator")}
-            className={`px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
               activeView === "simulator"
-                ? "bg-gray-800 text-white shadow-sm"
-                : "text-gray-400 hover:text-gray-200"
+                ? "bg-white text-indigo-700 shadow-sm font-semibold"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <Inbox className="w-3.5 h-3.5" />
-            <span>Email Ingestion &amp; Live Sync</span>
+            <span>Gmail Sync &amp; Simulator</span>
           </button>
         </nav>
 
@@ -93,28 +96,29 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Profile Tag */}
           <button
             onClick={onOpenProfileModal}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-900 border border-gray-800 hover:border-gray-700 text-xs text-gray-300 transition-colors"
-            title="Edit Profile & CGPA"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm text-xs text-slate-700 transition-all"
+            title="Edit Profile"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span className="font-medium text-white">{profile.cgpa.toFixed(2)} CGPA</span>
-            <span className="text-gray-500">•</span>
-            <span className="text-gray-400">{profile.branch}</span>
-            <Sliders className="w-3 h-3 text-gray-400 ml-0.5" />
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="font-semibold text-slate-800">{profile.branch}</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-600 font-mono">{profile.cgpa.toFixed(2)}</span>
+            <Sliders className="w-3 h-3 text-slate-400 ml-0.5" />
           </button>
 
           {/* Sync Emails */}
           <button
             onClick={onSyncGmail}
             disabled={isSyncing}
-            className="p-1.5 px-2.5 rounded-lg bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 hover:text-white transition-colors text-xs font-medium flex items-center gap-1.5"
-            title="Check new emails"
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all text-xs font-semibold flex items-center gap-1.5 disabled:opacity-75"
+            title="Sync latest emails from PESU_TAGGED"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-blue-400 ${isSyncing ? "animate-spin" : ""}`} />
-            <span className="hidden sm:inline">{isSyncing ? "Syncing..." : "Sync"}</span>
+            <RefreshCw className={`w-3.5 h-3.5 text-white ${isSyncing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">{isSyncing ? "Syncing..." : "Sync Mails"}</span>
           </button>
         </div>
       </div>
     </header>
   );
 };
+

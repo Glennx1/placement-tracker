@@ -8,12 +8,12 @@ import {
   EventType,
   ActionPortalType,
   Tier,
+  Category,
 } from "./types";
-import { evaluateEligibility } from "./eligibility";
-import { resolveCanonicalCompany } from "./companyResolver";
-import { parseEmailWithGemini } from "./gemini";
+import { resolveCanonicalEntity } from "./companyResolver";
+import { parseEmailWithGemini, fallbackHeuristicParser } from "./gemini";
+import { SAMPLE_PES_EMAILS } from "./sampleEmails";
 
-// Default Profile initialized with user's exact specification: CGPA: 7.62
 export const DEFAULT_STUDENT_PROFILE: StudentProfile = {
   id: "pes-student-01",
   name: "Candidate",
@@ -25,17 +25,106 @@ export const DEFAULT_STUDENT_PROFILE: StudentProfile = {
   activeBacklogs: 0,
 };
 
-// Start with a clean slate
+// Seed initial state with sample emails so the site is never blank
 function createInitialState(): {
   profile: StudentProfile;
   drives: CompanyDrive[];
   logs: IngestionLogEntry[];
 } {
-  return {
+  const store = {
     profile: { ...DEFAULT_STUDENT_PROFILE },
-    drives: [],
-    logs: [],
+    drives: [] as CompanyDrive[],
+    logs: [] as IngestionLogEntry[],
   };
+
+  // Seed sample drives synchronously using heuristic parser
+  const now = Date.now();
+  for (const email of SAMPLE_PES_EMAILS) {
+    const extraction = fallbackHeuristicParser(email.subject, email.sender, email.body, email.receivedAt);
+    const canonicalInfo = resolveCanonicalEntity(
+      extraction.companyName || extraction.canonicalName,
+      email.subject,
+      email.body
+    );
+
+    const canonicalName = canonicalInfo.canonicalName;
+    const displayName = extraction.companyName || canonicalInfo.name;
+    const category: Category = email.expectedCategory || canonicalInfo.category || "COMPANY";
+
+    let parentDrive = store.drives.find(
+      (d) => d.canonicalName.toLowerCase() === canonicalName.toLowerCase()
+    );
+
+    const isPastDeadline = extraction.deadline && new Date(extraction.deadline).getTime() < now;
+    const initialStatus: DriveStatus = isPastDeadline ? "EXPIRED" : "ACTIVE";
+
+    if (!parentDrive) {
+      parentDrive = {
+        id: `drive-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: displayName,
+        canonicalName,
+        category,
+        logoUrl: `https://logo.clearbit.com/${canonicalName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
+        role: extraction.role || (category === "HACKATHON" ? "Open Hackathon Track" : "Campus Opportunity"),
+        ctc: extraction.ctc || (category === "HACKATHON" ? "Cash Prizes & Awards" : "Competitive"),
+        stipend: extraction.stipend || null,
+        tier: (category === "HACKATHON" ? "COMPETITION" : (category === "WORKSHOP" ? "LEARNING" : (extraction.ctc && parseInt(extraction.ctc) >= 15 ? "TIER_1" : "TIER_2"))) as Tier,
+        minCgpa: extraction.minCgpa && extraction.minCgpa > 0 ? extraction.minCgpa : null,
+        allowedBranches: extraction.allowedBranches.length > 0 ? extraction.allowedBranches : ["ALL"],
+        maxBacklogs: extraction.maxBacklogs ?? 0,
+        status: initialStatus,
+        currentStage: extraction.eventType,
+        latestDeadline: extraction.deadline || null,
+        criteriaInfo: extraction.minCgpa && extraction.minCgpa > 0 ? `Cutoff: ${extraction.minCgpa} CGPA` : "Open to all students",
+        events: [],
+        actions: [],
+      };
+      store.drives.push(parentDrive);
+    } else {
+      parentDrive.currentStage = extraction.eventType;
+      if (extraction.deadline) {
+        parentDrive.latestDeadline = extraction.deadline;
+      }
+    }
+
+    const eventId = `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newEvent: PlacementEvent = {
+      id: eventId,
+      companyId: parentDrive.id,
+      eventType: extraction.eventType,
+      subject: email.subject,
+      senderEmail: email.sender,
+      receivedAt: email.receivedAt,
+      deadline: extraction.deadline || null,
+      actionUrl: extraction.actionUrl || null,
+      actionPortal: extraction.actionPortal,
+      shortlistCount: extraction.shortlistCount || null,
+      shortlistSnippet: extraction.shortlistSnippet || null,
+      instructions: extraction.instructions || null,
+      summary: extraction.summary,
+      rawBody: email.body,
+      gmailMessageId: email.id,
+      llmConfidence: extraction.confidenceScore || 0.95,
+    };
+    parentDrive.events.push(newEvent);
+
+    if (extraction.actionRequired && extraction.actionTitle) {
+      const actionItem: ActionItem = {
+        id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        companyId: parentDrive.id,
+        eventId: newEvent.id,
+        title: extraction.actionTitle,
+        portalType: extraction.actionPortal,
+        link: extraction.actionUrl || null,
+        deadline: extraction.deadline || null,
+        isCompleted: Boolean(isPastDeadline),
+        priority: extraction.deadline && (new Date(extraction.deadline).getTime() - now < 24 * 3600 * 1000) ? 1 : 2,
+      };
+      parentDrive.actions.push(actionItem);
+    }
+  }
+
+  return store;
 }
 
 // Global in-memory singleton store
@@ -60,13 +149,9 @@ class PlacementStore {
   }
 
   public getDrives(): CompanyDrive[] {
-    const student = this.state.profile;
     const now = Date.now();
 
     return this.state.drives.map((drive) => {
-      const eligibility = evaluateEligibility(drive, student);
-      
-      // Auto-expire drive if active but deadline has already passed
       let computedStatus = drive.status;
       if (
         computedStatus === "ACTIVE" &&
@@ -79,7 +164,6 @@ class PlacementStore {
       return {
         ...drive,
         status: computedStatus,
-        eligibility,
       };
     });
   }
@@ -119,6 +203,10 @@ class PlacementStore {
     this.state.logs = [];
   }
 
+  public resetDemo(): void {
+    this.state = createInitialState();
+  }
+
   public async ingestRawEmail(email: {
     subject: string;
     sender: string;
@@ -129,7 +217,7 @@ class PlacementStore {
     const receivedAt = email.receivedAt || new Date().toISOString();
     const now = Date.now();
     
-    // 1. LLM Structured Extraction
+    // 1. LLM / Heuristic Structured Extraction
     const extraction = await parseEmailWithGemini({
       subject: email.subject,
       sender: email.sender,
@@ -137,16 +225,20 @@ class PlacementStore {
       receivedAt,
     });
 
-    const canonicalInfo = resolveCanonicalCompany(extraction.companyName || extraction.canonicalName);
+    const canonicalInfo = resolveCanonicalEntity(
+      extraction.companyName || extraction.canonicalName,
+      email.subject,
+      email.body
+    );
     const canonicalName = canonicalInfo.canonicalName;
     const displayName = extraction.companyName || canonicalInfo.name;
+    const category: Category = extraction.category || canonicalInfo.category || "COMPANY";
 
-    // 2. Find or Create Parent Company Drive Node
+    // 2. Find or Create Parent Entity Node
     let parentDrive = this.state.drives.find(
       (d) => d.canonicalName.toLowerCase() === canonicalName.toLowerCase()
     );
 
-    // Check if initial status is expired due to past deadline
     const isPastDeadline = extraction.deadline && new Date(extraction.deadline).getTime() < now;
     const initialStatus: DriveStatus = isPastDeadline ? "EXPIRED" : "ACTIVE";
 
@@ -155,17 +247,19 @@ class PlacementStore {
         id: `drive-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         name: displayName,
         canonicalName,
+        category,
         logoUrl: `https://logo.clearbit.com/${canonicalName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`,
-        role: extraction.role || "Software Engineer",
-        ctc: extraction.ctc || "Competitive",
+        role: extraction.role || (category === "HACKATHON" ? "Open Hackathon Track" : (category === "WORKSHOP" ? "Technical Workshop" : "Software Engineer")),
+        ctc: extraction.ctc || (category === "HACKATHON" ? "Cash Prizes & Awards" : "Competitive"),
         stipend: extraction.stipend || null,
-        tier: (extraction.ctc && parseInt(extraction.ctc) >= 15 ? "TIER_1" : "TIER_2") as Tier,
-        minCgpa: extraction.minCgpa && extraction.minCgpa > 0 ? extraction.minCgpa : 7.0,
-        allowedBranches: extraction.allowedBranches.length > 0 ? extraction.allowedBranches : ["CSE", "ISE", "ECE"],
+        tier: (category === "HACKATHON" ? "COMPETITION" : (category === "WORKSHOP" ? "LEARNING" : (extraction.ctc && parseInt(extraction.ctc) >= 15 ? "TIER_1" : "TIER_2"))) as Tier,
+        minCgpa: extraction.minCgpa && extraction.minCgpa > 0 ? extraction.minCgpa : null,
+        allowedBranches: extraction.allowedBranches.length > 0 ? extraction.allowedBranches : ["ALL"],
         maxBacklogs: extraction.maxBacklogs ?? 0,
         status: initialStatus,
         currentStage: extraction.eventType,
         latestDeadline: extraction.deadline || null,
+        criteriaInfo: extraction.minCgpa && extraction.minCgpa > 0 ? `Cutoff: ${extraction.minCgpa} CGPA` : "Open to all students",
         events: [],
         actions: [],
       };
@@ -177,7 +271,7 @@ class PlacementStore {
       }
       if (extraction.eventType === "SHORTLIST_RELEASED") {
         parentDrive.status = "SHORTLISTED";
-      } else if (extraction.eventType === "OFFER_ANNOUNCEMENT") {
+      } else if (extraction.eventType === "OFFER_ANNOUNCEMENT" || extraction.eventType === "RESULTS_ANNOUNCEMENT") {
         parentDrive.status = "OFFERED";
       } else if (parentDrive.status === "ACTIVE" && isPastDeadline) {
         parentDrive.status = "EXPIRED";
@@ -207,7 +301,7 @@ class PlacementStore {
 
     parentDrive.events.push(newEvent);
 
-    // 4. Create Action Item only if not already expired/past
+    // 4. Create Action Item
     if (extraction.actionRequired && extraction.actionTitle) {
       const isActionExpired = extraction.deadline && new Date(extraction.deadline).getTime() < now;
       const actionItem: ActionItem = {
@@ -218,7 +312,7 @@ class PlacementStore {
         portalType: extraction.actionPortal,
         link: extraction.actionUrl || null,
         deadline: extraction.deadline || null,
-        isCompleted: Boolean(isActionExpired), // Mark as done/expired if from the past
+        isCompleted: Boolean(isActionExpired),
         priority: extraction.deadline && (new Date(extraction.deadline).getTime() - now < 24 * 3600 * 1000) ? 1 : 2,
       };
       parentDrive.actions.unshift(actionItem);
@@ -231,6 +325,7 @@ class PlacementStore {
       sender: email.sender,
       subject: email.subject,
       parsedCompany: canonicalName,
+      category,
       detectedEvent: extraction.eventType,
       status: "SUCCESS",
       timestamp: new Date().toISOString(),
@@ -239,10 +334,6 @@ class PlacementStore {
 
     const enrichedDrive = this.getDriveById(parentDrive.id)!;
     return { drive: enrichedDrive, event: newEvent, log };
-  }
-
-  public resetDemo(): void {
-    this.clearAllDrives();
   }
 }
 
@@ -253,3 +344,4 @@ export const placementStore = globalStore.__placementStore || new PlacementStore
 if (process.env.NODE_ENV !== "production") {
   globalStore.__placementStore = placementStore;
 }
+

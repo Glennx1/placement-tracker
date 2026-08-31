@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, CheckCircle2, Award } from "lucide-react";
+import { X, CheckCircle2, User } from "lucide-react";
 import { StudentProfile } from "@/lib/types";
 
 interface ProfileConfigModalProps {
@@ -38,36 +38,41 @@ export const ProfileConfigModal: React.FC<ProfileConfigModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-      <div className="relative w-full max-w-md bg-gray-900 border border-gray-800 rounded-xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+      <div className="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="p-4 border-b border-gray-800 flex items-center justify-between gap-3 bg-gray-950/60">
-          <div>
-            <h3 className="font-bold text-sm text-white">
-              Student Profile &amp; Eligibility
-            </h3>
-            <p className="text-xs text-gray-400">
-              Update your CGPA to recalculate cutoff matches
-            </p>
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/70">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
+              <User className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-slate-900">
+                Student Profile Configuration
+              </h3>
+              <p className="text-xs text-slate-500">
+                Update your branch and academic details
+              </p>
+            </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-3.5 text-xs">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {/* CGPA Slider */}
-          <div className="p-3 rounded-lg bg-gray-950 border border-gray-800 space-y-2">
+          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="font-semibold text-gray-200">
+              <label className="font-bold text-slate-800">
                 Your CGPA:
               </label>
-              <span className="font-mono text-sm font-bold text-emerald-400 px-2 py-0.5 bg-emerald-950 rounded border border-emerald-800">
+              <span className="font-mono text-sm font-bold text-indigo-700 px-2.5 py-0.5 bg-indigo-50 rounded-lg border border-indigo-200">
                 {cgpa.toFixed(2)}
               </span>
             </div>
@@ -79,24 +84,24 @@ export const ProfileConfigModal: React.FC<ProfileConfigModalProps> = ({
               step="0.01"
               value={cgpa}
               onChange={(e) => setCgpa(parseFloat(e.target.value))}
-              className="w-full h-1.5 bg-gray-800 rounded appearance-none cursor-pointer accent-emerald-500"
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
-            <div className="flex justify-between text-[10px] text-gray-500 font-mono">
+            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
               <span>5.00</span>
-              <span className="text-emerald-400 font-semibold">7.62 (Default)</span>
+              <span className="text-indigo-600 font-semibold">7.62 (Default)</span>
               <span>10.00</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                 Branch:
               </label>
               <select
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-gray-950 border border-gray-800 rounded-md text-xs text-gray-200 focus:outline-none focus:border-gray-700"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-indigo-400 font-medium"
               >
                 <option value="CSE">CSE</option>
                 <option value="ISE">ISE</option>
@@ -109,33 +114,33 @@ export const ProfileConfigModal: React.FC<ProfileConfigModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                 USN:
               </label>
               <input
                 type="text"
                 value={usn}
                 onChange={(e) => setUsn(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-gray-950 border border-gray-800 rounded-md text-xs text-gray-200 font-mono focus:outline-none focus:border-gray-700"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-400 font-medium"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                 Candidate Name:
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-gray-950 border border-gray-800 rounded-md text-xs text-gray-200 focus:outline-none focus:border-gray-700"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-indigo-400 font-medium"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-medium text-gray-400 mb-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
                 Active Backlogs:
               </label>
               <input
@@ -144,26 +149,26 @@ export const ProfileConfigModal: React.FC<ProfileConfigModalProps> = ({
                 max="10"
                 value={activeBacklogs}
                 onChange={(e) => setActiveBacklogs(parseInt(e.target.value) || 0)}
-                className="w-full px-2.5 py-1.5 bg-gray-950 border border-gray-800 rounded-md text-xs text-gray-200 font-mono focus:outline-none focus:border-gray-700"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-400 font-medium"
               />
             </div>
           </div>
 
           {/* Footer buttons */}
-          <div className="pt-2 border-t border-gray-800 flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-750 text-gray-300 text-xs transition-colors"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition-colors flex items-center gap-1"
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-xs"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Save &amp; Recalculate</span>
+              <span>Save Profile</span>
             </button>
           </div>
         </form>
@@ -171,3 +176,4 @@ export const ProfileConfigModal: React.FC<ProfileConfigModalProps> = ({
     </div>
   );
 };
+
